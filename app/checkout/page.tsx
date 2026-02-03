@@ -3,8 +3,6 @@
 import { useEffect, useState } from "react";
 import { useCart } from "../cart-context";
 
-const DEBUG_KEY = "pay_create_debug_v1";
-
 export default function CheckoutPage() {
   const { items, totalPrice } = useCart();
 
@@ -16,23 +14,8 @@ export default function CheckoutPage() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [debug, setDebug] = useState<string>("");
 
   // ✅ показываем сохранённый debug после перезагрузки
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(DEBUG_KEY);
-      if (saved) setDebug(saved);
-    } catch {}
-  }, []);
-
-  function saveDebug(obj: any) {
-    try {
-      const text = JSON.stringify(obj, null, 2);
-      localStorage.setItem(DEBUG_KEY, text);
-      setDebug(text);
-    } catch {}
-  }
 
   async function submit() {
     if (!items.length) {
