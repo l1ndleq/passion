@@ -1,13 +1,7 @@
-// app/api/pay/create/route.ts
 import { NextResponse } from "next/server";
 import { Redis } from "@upstash/redis";
 
-export const runtime = "nodejs"; // чтобы точно работало на Node runtime (а не edge)
-
-const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL!,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN!,
-});
+export const runtime = "nodejs";
 
 const ORDER_TTL_SECONDS = 60 * 60 * 24; // 24 часа
 
@@ -16,13 +10,7 @@ function makeOrderId() {
 }
 
 type CreatePayBody = {
-  customer?: {
-    name?: string;
-    phone?: string;
-    email?: string;
-    address?: string;
-    comment?: string;
-  };
+  customer?: Record<string, any>;
   items?: Array<{
     id?: string;
     title?: string;
@@ -31,15 +19,25 @@ type CreatePayBody = {
     image?: string;
   }>;
   totalPrice?: number;
-  // можешь добавить сюда то, что реально нужно хранить
 };
+
+function getRedisOrThrow() {
+  const url = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+
+  if (!url || !token) {
+    throw new Error(
+      "Upstash env missing: UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN"
+    );
+  }
+
+  return new Redis({ url, token });
+}
 
 export async function POST(req: Request) {
   try {
-    // 1) читаем body
     const body = (await req.json()) as CreatePayBody;
 
-    // 2) минимальная валидация
     const totalPrice = Number(body?.totalPrice ?? 0);
     if (!Number.isFinite(totalPrice) || totalPrice <= 0) {
       return NextResponse.json(
@@ -56,11 +54,8 @@ export async function POST(req: Request) {
       );
     }
 
-    // 3) создаём orderId
     const orderId = makeOrderId();
 
-    // 4) сохраняем заказ в Redis ДО оплаты
-    // Сохраняем только нужные поля, а не весь body целиком
     const order = {
       orderId,
       status: "pending_payment" as const,
@@ -70,21 +65,41 @@ export async function POST(req: Request) {
       totalPrice,
     };
 
+    const redis = getRedisOrThrow();
+
+    // ✅ лёгкая диагностика: если Redis недоступен — тут сразу вылетит с понятной ошибкой
     await redis.set(`order:${orderId}`, order, { ex: ORDER_TTL_SECONDS });
 
-    // 5) пока заглушка paymentUrl (заменишь на реальный confirmation_url от ЮKassa)
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
-    const paymentUrl = `${siteUrl}/thank-you?orderId=${encodeURIComponent(orderId)}`;
+    const siteUrl =
+      process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+    const paymentUrl = `${siteUrl}/thank-you?orderId=${encodeURIComponent(
+      orderId
+    )}`;
 
     return NextResponse.json({ ok: true, orderId, paymentUrl });
   } catch (e: unknown) {
-    const message =
-      e instanceof Error ? e.message : "create pay failed (unknown error)";
-    return NextResponse.json({ ok: false, error: message }, { status: 500 });
+    const message = e instanceof Error ? e.message : String(e);
+    // ВАЖНО: лог в Vercel
+    console.error("PAY CREATE ERROR:", message, e);
+
+    return NextResponse.json(
+      {
+        ok: false,
+        error: message,
+        debug: {
+          hasUpstashUrl: Boolean(process.env.UPSTASH_REDIS_REST_URL),
+          hasUpstashToken: Boolean(process.env.UPSTASH_REDIS_REST_TOKEN),
+          hasSiteUrl: Boolean(process.env.NEXT_PUBLIC_SITE_URL),
+        },
+      },
+      { status: 500 }
+    );
   }
 }
 
-// (не обязательно, но удобно) чтобы случайный GET не давал 404 и не путал
 export async function GET() {
-  return NextResponse.json({ ok: false, error: "Method Not Allowed" }, { status: 405 });
+  return NextResponse.json(
+    { ok: false, error: "Method Not Allowed" },
+    { status: 405 }
+  );
 }
