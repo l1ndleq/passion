@@ -3,6 +3,13 @@
 import { useState } from "react";
 import { useCart } from "../cart-context";
 
+import CheckoutClient from "./CheckoutClient";
+
+export default function CheckoutPage() {
+  // items/totalPrice получай как у тебя сейчас
+  return <CheckoutClient items={items} totalPrice={totalPrice} />;
+}
+
 export default function CheckoutPage() {
   const { items, totalPrice, clear } = useCart();
 
