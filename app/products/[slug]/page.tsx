@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { ProductCard } from "../product-card";
 
 const PRODUCTS = [
   {
