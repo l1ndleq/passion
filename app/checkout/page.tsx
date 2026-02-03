@@ -149,27 +149,6 @@ export default function CheckoutPage() {
 
       {error && <div className="mt-4 text-sm text-red-600">{error}</div>}
 
-      {debug && (
-        <pre className="mt-4 text-xs whitespace-pre-wrap border rounded-xl p-3 opacity-80">
-          {debug}
-        </pre>
-      )}
-
-      <div className="mt-3 flex gap-2">
-        <button
-          type="button"
-          onClick={() => {
-            try {
-              localStorage.removeItem(DEBUG_KEY);
-            } catch {}
-            setDebug("");
-          }}
-          className="text-xs underline opacity-70"
-        >
-          Очистить debug
-        </button>
-      </div>
-
       <button
         type="button"
         onClick={submit}
