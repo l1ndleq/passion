@@ -71,7 +71,7 @@ export async function POST(req: Request) {
     await redis.set(`order:${orderId}`, order, { ex: ORDER_TTL_SECONDS });
 
     const siteUrl =
-  (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/+$/, "");
+        (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/+$/, "");
     const paymentUrl = `${siteUrl}/order?orderId=${encodeURIComponent(orderId)}`;
 
     return NextResponse.json({ ok: true, orderId, paymentUrl });
