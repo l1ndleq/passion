@@ -72,7 +72,7 @@ export async function POST(req: Request) {
 
     const siteUrl =
         (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/+$/, "");
-    const paymentUrl = `${siteUrl}/order?orderId=${encodeURIComponent(orderId)}`;
+    const paymentUrl = `${siteUrl}/order/${orderId}`;
 
     return NextResponse.json({ ok: true, orderId, paymentUrl });
   } catch (e: unknown) {
