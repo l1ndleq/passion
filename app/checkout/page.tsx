@@ -15,59 +15,60 @@ export default function CheckoutPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function submit() {
-    if (!items.length) {
-      setError("Корзина пуста");
-      return;
-    }
-
-    if (!name || !contact) {
-      setError("Укажите имя и контакт");
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      // ❗ Абсолютный URL — 100% браузерный fetch
-      const res = await fetch(
-        `${window.location.origin}/api/pay/create`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            customer: {
-              name,
-              contact,
-              city,
-              address,
-              message,
-            },
-            items: items.map((i) => ({
-              id: i.id,
-              title: i.title,
-              price: i.price,
-              qty: i.qty,
-            })),
-            totalPrice,
-          }),
-        }
-      );
-
-      const data = await res.json();
-
-      if (!res.ok || !data?.ok || !data?.paymentUrl) {
-        throw new Error(data?.error || "Не удалось создать оплату");
-      }
-
-      // редирект на оплату
-      window.location.href = data.paymentUrl;
-    } catch (e: any) {
-      setError(e?.message || "Ошибка оформления заказа");
-      setLoading(false);
-    }
+async function submit() {
+  if (!items.length) {
+    setError("Корзина пуста");
+    return;
   }
+
+  if (!name || !contact) {
+    setError("Укажите имя и контакт");
+    return;
+  }
+
+  setLoading(true);
+  setError(null);
+
+  try {
+    const res = await fetch(`${window.location.origin}/api/pay/create`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        customer: { name, contact, city, address, message },
+        items: items.map((i) => ({
+          id: i.id,
+          title: i.title,
+          price: i.price,
+          qty: i.qty,
+        })),
+        totalPrice,
+      }),
+    });
+
+    const data = await res.json();
+
+    console.log("pay/create response:", data);
+
+    if (!res.ok || !data?.ok) {
+      throw new Error(data?.error || "Не удалось создать оплату");
+    }
+
+    if (!data?.paymentUrl || typeof data.paymentUrl !== "string") {
+      throw new Error("paymentUrl не пришёл с сервера");
+    }
+
+    // важное: чтобы точно не было относительного url
+    const url = data.paymentUrl.startsWith("http")
+      ? data.paymentUrl
+      : `${window.location.origin}${data.paymentUrl}`;
+
+    window.location.assign(url);
+  } catch (e: any) {
+    setError(e?.message || "Ошибка оформления заказа");
+  } finally {
+    setLoading(false);
+  }
+}
 
   return (
     <div className="p-6 max-w-2xl mx-auto">
