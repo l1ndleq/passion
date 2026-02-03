@@ -49,12 +49,7 @@ export default function CheckoutPage() {
       const data = await res.json().catch(() => null);
 
       // ✅ сохраняем ВСЁ, чтобы увидеть даже после “обновления”
-      saveDebug({
-        at: new Date().toISOString(),
-        status: res.status,
-        ok: res.ok,
-        data,
-      });
+  
 
       if (!res.ok || !data?.ok) {
         throw new Error(data?.error || "Не удалось создать оплату");
