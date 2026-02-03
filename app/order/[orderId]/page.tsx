@@ -5,7 +5,7 @@ type Props = {
 };
 
 export default function OrderPage({ params }: Props) {
-  const orderId = params.orderId;
+  const orderId = params?.orderId;
 
   return (
     <div className="p-6 max-w-xl mx-auto text-center">
