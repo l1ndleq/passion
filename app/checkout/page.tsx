@@ -81,6 +81,7 @@ export default function CheckoutPage() {
 
       {/* Корзина */}
       <div className="mt-6 space-y-3">
+        <div className="text-xs opacity-60">BUILD: checkout-v3</div>
         {items.map((item) => (
           <div
             key={item.id}
