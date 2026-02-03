@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useCart } from "../cart-context";
+
+const DEBUG_KEY = "pay_create_debug_v1";
 
 export default function CheckoutPage() {
   const { items, totalPrice } = useCart();
@@ -14,16 +16,29 @@ export default function CheckoutPage() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // ✅ чтобы видеть, что реально вернул /api/pay/create
   const [debug, setDebug] = useState<string>("");
+
+  // ✅ показываем сохранённый debug после перезагрузки
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(DEBUG_KEY);
+      if (saved) setDebug(saved);
+    } catch {}
+  }, []);
+
+  function saveDebug(obj: any) {
+    try {
+      const text = JSON.stringify(obj, null, 2);
+      localStorage.setItem(DEBUG_KEY, text);
+      setDebug(text);
+    } catch {}
+  }
 
   async function submit() {
     if (!items.length) {
       setError("Корзина пуста");
       return;
     }
-
     if (!name || !contact) {
       setError("Укажите имя и контакт");
       return;
@@ -31,7 +46,6 @@ export default function CheckoutPage() {
 
     setLoading(true);
     setError(null);
-    setDebug("");
 
     try {
       const res = await fetch(`${window.location.origin}/api/pay/create`, {
@@ -51,8 +65,13 @@ export default function CheckoutPage() {
 
       const data = await res.json().catch(() => null);
 
-      // ✅ показываем на странице, даже если консоль очищается
-      setDebug(JSON.stringify({ status: res.status, data }, null, 2));
+      // ✅ сохраняем ВСЁ, чтобы увидеть даже после “обновления”
+      saveDebug({
+        at: new Date().toISOString(),
+        status: res.status,
+        ok: res.ok,
+        data,
+      });
 
       if (!res.ok || !data?.ok) {
         throw new Error(data?.error || "Не удалось создать оплату");
@@ -66,7 +85,10 @@ export default function CheckoutPage() {
         ? data.paymentUrl
         : `${window.location.origin}${data.paymentUrl}`;
 
-      window.location.assign(url);
+      // ✅ даём 1 секунду, чтобы ты успел увидеть debug на странице
+      setTimeout(() => {
+        window.location.assign(url);
+      }, 1000);
     } catch (e: any) {
       setError(e?.message || "Ошибка оформления заказа");
     } finally {
@@ -81,8 +103,7 @@ export default function CheckoutPage() {
       </div>
 
       <h1 className="mt-3 text-3xl leading-tight">Оформление заказа</h1>
-
-      <div className="mt-2 text-xs opacity-60">BUILD: checkout-v4</div>
+      <div className="mt-2 text-xs opacity-60">BUILD: checkout-v5</div>
 
       {/* Корзина */}
       <div className="mt-6 space-y-3">
@@ -156,11 +177,26 @@ export default function CheckoutPage() {
         </pre>
       )}
 
+      <div className="mt-3 flex gap-2">
+        <button
+          type="button"
+          onClick={() => {
+            try {
+              localStorage.removeItem(DEBUG_KEY);
+            } catch {}
+            setDebug("");
+          }}
+          className="text-xs underline opacity-70"
+        >
+          Очистить debug
+        </button>
+      </div>
+
       <button
         type="button"
         onClick={submit}
         disabled={loading}
-        className="mt-8 w-full rounded-full bg-black text-white py-3 text-sm disabled:opacity-50"
+        className="mt-6 w-full rounded-full bg-black text-white py-3 text-sm disabled:opacity-50"
       >
         {loading ? "Переход к оплате..." : "Перейти к оплате"}
       </button>
