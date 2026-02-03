@@ -3,15 +3,8 @@
 import { useState } from "react";
 import { useCart } from "../cart-context";
 
-import CheckoutClient from "./CheckoutClient";
-
 export default function CheckoutPage() {
-  // items/totalPrice получай как у тебя сейчас
-  return <CheckoutClient items={items} totalPrice={totalPrice} />;
-}
-
-export default function CheckoutPage() {
-  const { items, totalPrice, clear } = useCart();
+  const { items, totalPrice } = useCart();
 
   const [name, setName] = useState("");
   const [contact, setContact] = useState("");
@@ -60,17 +53,14 @@ export default function CheckoutPage() {
 
       const data = await res.json();
 
-      if (!res.ok || !data?.ok) {
+      if (!res.ok || !data?.ok || !data?.paymentUrl) {
         throw new Error(data?.error || "Не удалось создать оплату");
       }
 
-      // ❗ НЕ очищаем корзину здесь
-      // очистка возможна после webhook / thank-you при желании
-
-      // редирект на оплату
+      // Редирект на оплату
       window.location.href = data.paymentUrl;
     } catch (e: any) {
-      setError(e.message || "Ошибка оформления заказа");
+      setError(e?.message || "Ошибка оформления заказа");
       setLoading(false);
     }
   }
@@ -146,11 +136,7 @@ export default function CheckoutPage() {
         />
       </div>
 
-      {error && (
-        <div className="mt-4 text-sm text-red-600">
-          {error}
-        </div>
-      )}
+      {error && <div className="mt-4 text-sm text-red-600">{error}</div>}
 
       <button
         onClick={submit}
