@@ -15,60 +15,64 @@ export default function CheckoutPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-async function submit() {
-  if (!items.length) {
-    setError("Корзина пуста");
-    return;
-  }
+  // ✅ чтобы видеть, что реально вернул /api/pay/create
+  const [debug, setDebug] = useState<string>("");
 
-  if (!name || !contact) {
-    setError("Укажите имя и контакт");
-    return;
-  }
-
-  setLoading(true);
-  setError(null);
-
-  try {
-    const res = await fetch(`${window.location.origin}/api/pay/create`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        customer: { name, contact, city, address, message },
-        items: items.map((i) => ({
-          id: i.id,
-          title: i.title,
-          price: i.price,
-          qty: i.qty,
-        })),
-        totalPrice,
-      }),
-    });
-
-    const data = await res.json();
-
-    console.log("pay/create response:", data);
-
-    if (!res.ok || !data?.ok) {
-      throw new Error(data?.error || "Не удалось создать оплату");
+  async function submit() {
+    if (!items.length) {
+      setError("Корзина пуста");
+      return;
     }
 
-    if (!data?.paymentUrl || typeof data.paymentUrl !== "string") {
-      throw new Error("paymentUrl не пришёл с сервера");
+    if (!name || !contact) {
+      setError("Укажите имя и контакт");
+      return;
     }
 
-    // важное: чтобы точно не было относительного url
-    const url = data.paymentUrl.startsWith("http")
-      ? data.paymentUrl
-      : `${window.location.origin}${data.paymentUrl}`;
+    setLoading(true);
+    setError(null);
+    setDebug("");
 
-    window.location.assign(url);
-  } catch (e: any) {
-    setError(e?.message || "Ошибка оформления заказа");
-  } finally {
-    setLoading(false);
+    try {
+      const res = await fetch(`${window.location.origin}/api/pay/create`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customer: { name, contact, city, address, message },
+          items: items.map((i) => ({
+            id: i.id,
+            title: i.title,
+            price: i.price,
+            qty: i.qty,
+          })),
+          totalPrice,
+        }),
+      });
+
+      const data = await res.json().catch(() => null);
+
+      // ✅ показываем на странице, даже если консоль очищается
+      setDebug(JSON.stringify({ status: res.status, data }, null, 2));
+
+      if (!res.ok || !data?.ok) {
+        throw new Error(data?.error || "Не удалось создать оплату");
+      }
+
+      if (!data?.paymentUrl || typeof data.paymentUrl !== "string") {
+        throw new Error("paymentUrl не пришёл с сервера");
+      }
+
+      const url = data.paymentUrl.startsWith("http")
+        ? data.paymentUrl
+        : `${window.location.origin}${data.paymentUrl}`;
+
+      window.location.assign(url);
+    } catch (e: any) {
+      setError(e?.message || "Ошибка оформления заказа");
+    } finally {
+      setLoading(false);
+    }
   }
-}
 
   return (
     <div className="p-6 max-w-2xl mx-auto">
@@ -76,9 +80,9 @@ async function submit() {
         PASSION / CHECKOUT
       </div>
 
-      <h1 className="mt-3 text-3xl leading-tight">
-        Оформление заказа
-      </h1>
+      <h1 className="mt-3 text-3xl leading-tight">Оформление заказа</h1>
+
+      <div className="mt-2 text-xs opacity-60">BUILD: checkout-v4</div>
 
       {/* Корзина */}
       <div className="mt-6 space-y-3">
@@ -144,13 +148,16 @@ async function submit() {
         />
       </div>
 
-      {error && (
-        <div className="mt-4 text-sm text-red-600">
-          {error}
-        </div>
+      {error && <div className="mt-4 text-sm text-red-600">{error}</div>}
+
+      {debug && (
+        <pre className="mt-4 text-xs whitespace-pre-wrap border rounded-xl p-3 opacity-80">
+          {debug}
+        </pre>
       )}
 
       <button
+        type="button"
         onClick={submit}
         disabled={loading}
         className="mt-8 w-full rounded-full bg-black text-white py-3 text-sm disabled:opacity-50"
