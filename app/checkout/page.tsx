@@ -30,26 +30,30 @@ export default function CheckoutPage() {
     setError(null);
 
     try {
-      const res = await fetch("/api/pay/create", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          customer: {
-            name,
-            contact,
-            city,
-            address,
-            message,
-          },
-          items: items.map((i) => ({
-            id: i.id,
-            title: i.title,
-            price: i.price,
-            qty: i.qty,
-          })),
-          totalPrice,
-        }),
-      });
+      // ❗ Абсолютный URL — 100% браузерный fetch
+      const res = await fetch(
+        `${window.location.origin}/api/pay/create`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            customer: {
+              name,
+              contact,
+              city,
+              address,
+              message,
+            },
+            items: items.map((i) => ({
+              id: i.id,
+              title: i.title,
+              price: i.price,
+              qty: i.qty,
+            })),
+            totalPrice,
+          }),
+        }
+      );
 
       const data = await res.json();
 
@@ -57,7 +61,7 @@ export default function CheckoutPage() {
         throw new Error(data?.error || "Не удалось создать оплату");
       }
 
-      // Редирект на оплату
+      // редирект на оплату
       window.location.href = data.paymentUrl;
     } catch (e: any) {
       setError(e?.message || "Ошибка оформления заказа");
@@ -70,7 +74,10 @@ export default function CheckoutPage() {
       <div className="text-[10px] tracking-[0.22em] uppercase opacity-60">
         PASSION / CHECKOUT
       </div>
-      <h1 className="mt-3 text-3xl leading-tight">Оформление заказа</h1>
+
+      <h1 className="mt-3 text-3xl leading-tight">
+        Оформление заказа
+      </h1>
 
       {/* Корзина */}
       <div className="mt-6 space-y-3">
@@ -136,7 +143,11 @@ export default function CheckoutPage() {
         />
       </div>
 
-      {error && <div className="mt-4 text-sm text-red-600">{error}</div>}
+      {error && (
+        <div className="mt-4 text-sm text-red-600">
+          {error}
+        </div>
+      )}
 
       <button
         onClick={submit}
