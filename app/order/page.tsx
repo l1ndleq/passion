@@ -1,10 +1,12 @@
+export const dynamic = "force-dynamic";
+
 "use client";
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { useMemo } from "react";
+import { Suspense, useMemo } from "react";
 
-export default function OrderFallbackPage() {
+function OrderContent() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
@@ -35,5 +37,20 @@ export default function OrderFallbackPage() {
         На главную
       </Link>
     </div>
+  );
+}
+
+export default function OrderFallbackPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="p-6 max-w-xl mx-auto text-center">
+          <h1 className="text-2xl font-semibold">Заказ создан ✅</h1>
+          <p className="mt-4 text-sm opacity-70">Загружаем номер заказа…</p>
+        </div>
+      }
+    >
+      <OrderContent />
+    </Suspense>
   );
 }
