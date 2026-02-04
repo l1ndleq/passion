@@ -14,7 +14,7 @@ export function ProductCard({ product }: { product: Product }) {
 
   return (
     <div className="group rounded-2xl border border-black/5 bg-white/60 p-3 shadow-sm backdrop-blur transition hover:-translate-y-0.5 hover:shadow-md">
-      <Link href={`/products/${product.id}`} className="block">
+      <Link href={`/product/${product.id}`} className="block">
         <div className="relative aspect-square overflow-hidden rounded-xl bg-black/[0.03]">
           <Image
             src={img}
