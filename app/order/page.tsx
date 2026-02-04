@@ -1,10 +1,10 @@
-export const dynamic = "force-dynamic";
-
 "use client";
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Suspense, useMemo } from "react";
+
+export const dynamic = "force-dynamic";
 
 function OrderContent() {
   const pathname = usePathname();
