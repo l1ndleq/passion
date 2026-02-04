@@ -22,7 +22,7 @@ export default function RootLayout({
             <div className="mx-auto max-w-6xl px-5 py-4 flex items-center justify-between">
               <Link href="/" className="flex items-center">
                 <Image
-                  src="/brand/logo.jpg"
+                  src="/brand/logo.png"
                   alt="PASSION"
                   width={120}
                   height={32}
