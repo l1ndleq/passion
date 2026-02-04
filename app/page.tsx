@@ -139,20 +139,19 @@ export default function HomePage() {
 
 <div className="mt-10 grid gap-5 md:grid-cols-3">
   {featured.map((p, idx) => (
-    <ProductCard
-      key={p.slug}
-      product={{
-        id: p.slug,
-        title: `${p.name} · ${p.subtitle}`,
-        price: 0,
-        image:
-          p.image ||
-          (idx % 2 === 0
-            ? "/images/placeholder-product.jpg"
-            : "/images/placeholder-product.jpg"),
-        badge: p.category,
-      }}
-    />
+ <ProductCard
+  key={p.slug}
+  href={`/product/${p.slug}`}
+  title={`${p.name} · ${p.subtitle}`}
+  price={0}
+  image={"/images/placeholder-product.jpg"}
+  badge={p.category}
+  actions={
+    <span className="text-xs underline underline-offset-4 text-black/70 hover:opacity-70 transition">
+      Перейти
+    </span>
+  }
+/>
   ))}
 </div>
 
