@@ -1,4 +1,6 @@
 import "./globals.css";
+import Image from "next/image";
+import Link from "next/link";
 import Link from "next/link";
 import { Providers } from "./providers";
 
@@ -19,9 +21,15 @@ export default function RootLayout({
         <div className="min-h-screen bg-[#fbf7f3] text-[#141414]">
           <header className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-[#fbf7f3]/70 bg-[#fbf7f3]/90 border-b border-black/5">
             <div className="mx-auto max-w-6xl px-5 py-4 flex items-center justify-between">
-              <Link href="/" className="tracking-[0.22em] text-xs uppercase">
-                passion
-              </Link>
+              <Link href="/" className="flex items-center">
+                <Image
+                  src="/brand/logo.png"
+                  alt="PASSION"
+                  width={120}
+                  height={32}
+                  priority
+                  />
+                </Link>
 
               <nav className="flex items-center gap-5 text-xs tracking-wide uppercase text-black/70">
                 <Link className="hover:text-black transition" href="/about">
