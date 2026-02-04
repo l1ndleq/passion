@@ -24,34 +24,36 @@ export function ProductCard({
   const img = image?.trim() || "/images/placeholder-product.jpg";
 
   return (
-    <div className="group rounded-2xl border border-black/5 bg-white/70 p-3 shadow-sm backdrop-blur transition hover:-translate-y-0.5 hover:shadow-md">
+    <div className="group overflow-hidden rounded-2xl border border-black/10 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
       <Link href={href} className="block">
-        <div className="relative aspect-square overflow-hidden rounded-xl bg-black/[0.03]">
+        <div className="relative aspect-[4/3] bg-black/[0.03]">
           <Image
             src={img}
             alt={title}
             fill
-            className="object-cover transition-transform duration-300 group-hover:scale-105"
-            sizes="(max-width: 768px) 50vw, (max-width: 1200px) 25vw, 20vw"
+            className="object-cover"
+            sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
+            priority={false}
           />
+
           {badge ? (
-            <span className="absolute left-2 top-2 rounded-full bg-black px-3 py-1 text-xs font-medium text-white">
+            <span className="absolute left-3 top-3 rounded-full bg-black/85 px-3 py-1 text-xs font-medium text-white">
               {badge}
             </span>
           ) : null}
         </div>
 
-        <div className="mt-3 space-y-2">
-          <h3 className="line-clamp-2 text-sm font-medium leading-snug">
+        {/* ТЕКСТОВЫЙ БЛОК — принудительно читаемый */}
+        <div className="p-4">
+          <h3 className="line-clamp-2 text-sm font-medium leading-snug text-black">
             {title}
           </h3>
 
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-sm font-semibold">
+          <div className="mt-3 flex items-center justify-between gap-3">
+            <span className="text-sm font-semibold text-black">
               {price.toLocaleString("ru-RU")} ₽
             </span>
 
-            {/* чтобы клики по кнопкам не открывали страницу */}
             <div
               onClick={(e) => {
                 e.preventDefault();
