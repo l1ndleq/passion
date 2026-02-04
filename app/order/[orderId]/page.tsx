@@ -1,22 +1,18 @@
 export const dynamic = "force-dynamic";
 
-export default function OrderPage({
-  params,
-}: {
-  params: { orderId: string };
-}) {
+export default function OrderPage({ params }: { params: any }) {
   return (
-    <main className="mx-auto max-w-2xl px-4 py-16 text-center">
-      <h1 className="text-2xl font-semibold">Заказ создан ✅</h1>
-
-      <p>DEPLOY_TEST_123</p>
-
-      <p className="mt-4 text-sm opacity-70">Номер заказа:</p>
-      <p className="mt-1 font-mono text-lg">{params.orderId}</p>
-
-      <p className="mt-6">
-        Мы получили ваш заказ. Скоро подключим оплату ЮKassa и уведомления.
-      </p>
+    <main style={{ padding: 40 }}>
+      <h1>DEBUG</h1>
+      <div style={{ marginTop: 12, padding: 12, border: "1px solid #000" }}>
+        <div>pathname segment should be orderId</div>
+        <div>
+          params.orderId: <b>{String(params?.orderId)}</b>
+        </div>
+        <pre style={{ marginTop: 12, whiteSpace: "pre-wrap" }}>
+          {JSON.stringify(params, null, 2)}
+        </pre>
+      </div>
     </main>
   );
 }
