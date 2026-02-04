@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ProductCard } from "@/components/ProductCard";
 
 type Product = {
   slug: string;
@@ -6,6 +7,9 @@ type Product = {
   subtitle: string;
   category: string;
   note: string;
+  // если позже добавишь картинки — просто начни прокидывать сюда:
+  image?: string;
+  badge?: string;
 };
 
 const featured: Product[] = [
@@ -15,6 +19,7 @@ const featured: Product[] = [
     subtitle: "Gentle Cleanser",
     category: "Очищение",
     note: "Мягкое ежедневное очищение, которое сохраняет комфорт кожи.",
+    badge: "New",
   },
   {
     slug: "glow-serum",
@@ -22,6 +27,7 @@ const featured: Product[] = [
     subtitle: "Daily Radiance",
     category: "Сыворотка",
     note: "Ровный тон и естественное сияние без утяжеления.",
+    badge: "Bestseller",
   },
   {
     slug: "soft-cream",
@@ -132,35 +138,25 @@ export default function HomePage() {
         </div>
 
         <div className="mt-10 grid gap-5 md:grid-cols-3">
-          {featured.map((p) => (
-            <Link
+          {featured.map((p, idx) => (
+            <ProductCard
               key={p.slug}
               href={`/product/${p.slug}`}
-              className="group rounded-[28px] border border-black/10 bg-white/40 overflow-hidden hover:border-black/20 transition"
-            >
-              <div className="aspect-[4/3] bg-gradient-to-b from-black/[0.06] to-black/[0.02]" />
-
-              <div className="p-6">
-                <div className="text-[10px] uppercase tracking-[0.22em] text-black/55">
-                  {p.category}
-                </div>
-
-                <h3 className="mt-3 text-lg font-light tracking-[-0.02em]">
-                  {p.name}
-                </h3>
-                <p className="mt-1 text-xs uppercase tracking-[0.22em] text-black/45">
-                  {p.subtitle}
-                </p>
-
-                <p className="mt-4 text-sm text-black/70 leading-relaxed">
-                  {p.note}
-                </p>
-
-                <div className="mt-6 text-sm text-black/70 underline underline-offset-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                  Перейти к продукту
-                </div>
-              </div>
-            </Link>
+              title={`${p.name} · ${p.subtitle}`}
+              price={0} // на главной можно не показывать цену; если будет — подставишь
+              image={
+                p.image ||
+                (idx % 2 === 0
+                  ? "/images/placeholder-product.jpg"
+                  : "/images/placeholder-product.jpg")
+              }
+              badge={p.badge || p.category}
+              actions={
+                <span className="text-xs underline underline-offset-4 text-black/70 hover:opacity-70 transition">
+                  Перейти
+                </span>
+              }
+            />
           ))}
         </div>
 

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AddToCartButton } from "../add-to-cart-button";
+import { ProductCard } from "@/components/ProductCard";
 
 type Product = {
   id: string;
@@ -8,6 +9,7 @@ type Product = {
   description?: string;
   volume?: string; // например "150 ml"
   tag?: string; // например "New"
+  image?: string; // опционально (если потом появятся реальные картинки)
 };
 
 const PRODUCTS: Product[] = [
@@ -18,6 +20,7 @@ const PRODUCTS: Product[] = [
     volume: "150 ml",
     description: "Нежный крем для ежедневного ухода и восстановления.",
     tag: "Bestseller",
+    // image: "/images/soft-cream.jpg",
   },
   {
     id: "body-oil",
@@ -25,6 +28,7 @@ const PRODUCTS: Product[] = [
     price: 1290,
     volume: "100 ml",
     description: "Питательное масло для тела — мягкость и сияние кожи.",
+    // image: "/images/body-oil.jpg",
   },
   {
     id: "scrub",
@@ -33,19 +37,22 @@ const PRODUCTS: Product[] = [
     volume: "200 ml",
     description: "Скраб для гладкости: обновление и тонус.",
     tag: "New",
+    // image: "/images/scrub.jpg",
   },
 ];
 
 export default function ProductsPage() {
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      {/* Верхняя часть (как у тебя “PASSION / …”) */}
-      <div className="flex items-start justify-between gap-6">
+    <div className="mx-auto max-w-6xl px-4 py-10">
+      {/* Header */}
+      <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="text-[10px] tracking-[0.22em] uppercase opacity-60">
             PASSION / PRODUCTS
           </div>
+
           <h1 className="mt-3 text-4xl leading-tight">Продукты</h1>
+
           <p className="mt-3 max-w-xl text-sm opacity-70">
             Выбери продукт и добавь в корзину. Отправка в Telegram происходит
             только при оформлении заказа.
@@ -59,63 +66,52 @@ export default function ProductsPage() {
         </div>
       </div>
 
-      {/* Сетка товаров */}
-      <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {PRODUCTS.map((p) => (
-          <div
+      {/* Grid */}
+      <div className="mt-10 grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {PRODUCTS.map((p, idx) => (
+          <ProductCard
             key={p.id}
-            className="rounded-2xl border bg-white/40 p-5 flex flex-col"
-          >
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <div className="text-lg font-medium">{p.title}</div>
-                {p.volume && (
-                  <div className="mt-1 text-xs opacity-60">{p.volume}</div>
-                )}
-              </div>
-
-              {p.tag && (
-                <div className="text-[10px] tracking-[0.18em] uppercase px-3 py-1 rounded-full border opacity-70">
-                  {p.tag}
-                </div>
-              )}
-            </div>
-
-            {p.description && (
-              <div className="mt-3 text-sm opacity-70">{p.description}</div>
-            )}
-
-            <div className="mt-auto pt-6 flex items-center justify-between gap-4">
-              <div className="text-sm font-semibold">{p.price} ₽</div>
-
+            href={`/products/${p.id}`}
+            title={p.volume ? `${p.title} · ${p.volume}` : p.title}
+            price={p.price}
+            image={
+              p.image ||
+              (idx % 2 === 0
+                ? "/images/placeholder-product.jpg"
+                : "/images/placeholder-product.jpg")
+            }
+            badge={p.tag || undefined}
+            actions={
               <AddToCartButton
                 product={{ id: p.id, title: p.title, price: p.price }}
               />
-            </div>
-          </div>
+            }
+          />
         ))}
       </div>
 
-      {/* Нижняя подсказка */}
-      <div className="mt-12 rounded-2xl border p-5 bg-white/30">
+      {/* Bottom info */}
+      <div className="mt-12 rounded-3xl border border-black/5 bg-white/60 p-6 shadow-sm backdrop-blur">
         <div className="text-[10px] tracking-[0.22em] uppercase opacity-60">
           Доставка
         </div>
-        <p className="mt-2 text-sm opacity-70">
+
+        <p className="mt-2 max-w-2xl text-sm opacity-70">
           Укажи город и адрес на странице оформления заказа — мы подтвердим
           стоимость и сроки.
         </p>
 
-        <div className="mt-4 flex gap-3">
+        <div className="mt-5 flex flex-wrap gap-3">
           <Link
             href="/cart"
-            className="px-4 py-2 rounded-full bg-black text-white text-sm"
+            className="rounded-full bg-black px-5 py-3 text-sm font-medium text-white hover:opacity-90"
           >
             Перейти в корзину
           </Link>
+
           <Link
             href="/checkout"
-            className="px-4 py-2 rounded-full border text-sm"
+            className="rounded-full border border-black/10 bg-white px-5 py-3 text-sm font-medium hover:bg-black/[0.03]"
           >
             Оформление
           </Link>
