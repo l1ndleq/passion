@@ -1,19 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useMemo } from "react";
 
-export default function OrderPage() {
+export default function OrderFallbackPage() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
 
-  // ожидаем /order/<orderId>
   const orderId = useMemo(() => {
+    // 1) если вдруг окажемся на /order?orderId=...
+    const q = searchParams.get("orderId");
+    if (q) return q;
+
+    // 2) если мы на /order/<id>
     const parts = (pathname || "").split("/").filter(Boolean);
     const idx = parts.indexOf("order");
-    if (idx === -1) return "";
-    return parts[idx + 1] || "";
-  }, [pathname]);
+    return idx !== -1 ? parts[idx + 1] || "" : "";
+  }, [pathname, searchParams]);
 
   return (
     <div className="p-6 max-w-xl mx-auto text-center">
