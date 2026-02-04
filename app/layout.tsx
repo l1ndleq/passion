@@ -25,7 +25,7 @@ export default function RootLayout({
                   src="/brand/logo.png"
                   alt="PASSION"
                   width={120}
-                  height={32}
+                  height={16}
                   priority
                   />
                 </Link>
