@@ -1,11 +1,17 @@
 import Link from "next/link";
 
-export default function OrderDynamicPage({
+// app/order/[orderId]/page.tsx
+export const dynamic = "force-dynamic";
+
+import OrderClient from "./OrderClient";
+
+export default function OrderPage({
   params,
 }: {
   params: { orderId: string };
 }) {
-  return (
+  return <OrderClient orderId={params.orderId} />;
+(
     <div className="p-6 max-w-xl mx-auto text-center">
       <h1 className="text-2xl font-semibold">Заказ создан ✅</h1>
 
