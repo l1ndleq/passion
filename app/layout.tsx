@@ -19,14 +19,14 @@ export default function RootLayout({
         
         <div className="min-h-screen bg-[#fbf7f3] text-[#141414]">
           <header className="border-b border-black/10">
-           <div className="mx-auto max-w-6xl px-5 py-3 flex items-center justify-between">
+           <div className="mx-auto max-w-6xl px-5 py-1.5 flex items-center justify-between">
             {/* логотип */}
             <Link href="/" className="flex items-center">
             <Image
              src="/brand/logo.png"
              alt="PASSION"
-            width={96}
-            height={28}
+            width={88}
+            height={26}
              priority
              />
               </Link>
