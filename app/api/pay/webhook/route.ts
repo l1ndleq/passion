@@ -1,3 +1,5 @@
+export const runtime = "nodejs";
+
 import { NextResponse } from "next/server";
 import { Redis } from "@upstash/redis";
 
@@ -7,18 +9,32 @@ const redis = new Redis({
 });
 
 async function sendTelegram(text: string) {
-  const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN!;
-  const raw = process.env.TELEGRAM_CHAT_ID || "";
-  const chatIds = raw.split(",").map((s) => s.trim()).filter(Boolean);
+  const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+  const raw = process.env.TELEGRAM_CHAT_IDS || "";
+
+  const CHAT_IDS = raw
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean);
+
+  if (!BOT_TOKEN) throw new Error("Missing TELEGRAM_BOT_TOKEN");
+  if (!CHAT_IDS.length) throw new Error("Missing TELEGRAM_CHAT_IDS (comma-separated)");
 
   const results = await Promise.all(
-    chatIds.map(async (chatId) => {
+    CHAT_IDS.map(async (chatId) => {
       const r = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML" }),
+        body: JSON.stringify({
+          chat_id: chatId,
+          text,
+          parse_mode: "HTML",
+          disable_web_page_preview: true,
+        }),
       });
-      return { chatId, status: r.status, data: await r.json().catch(() => null) };
+
+      const bodyText = await r.text();
+      return { chatId, status: r.status, body: bodyText };
     })
   );
 
@@ -27,26 +43,24 @@ async function sendTelegram(text: string) {
 
 export async function POST(req: Request) {
   try {
-    /**
-     * В реальной интеграции тут будет проверка подписи webhook!
-     * (Stripe signature / ЮKassa signature / CloudPayments HMAC и т.д.)
-     */
-
     const payload = await req.json();
 
-    // Пример: считаем что провайдер прислал orderId и статус
+    // Под твой тест (ты шлёшь {orderId, status})
     const orderId = payload?.orderId;
-    const status = payload?.status; // "paid" например
+    const status = payload?.status;
 
     if (!orderId) {
       return NextResponse.json({ ok: false, error: "missing orderId" }, { status: 400 });
     }
 
-    const order = await redis.get<any>(`order:${orderId}`);
-    if (!order) return NextResponse.json({ ok: false, error: "order not found" }, { status: 404 });
+    const key = `order:${orderId}`;
+    const order = await redis.get<any>(key);
+
+    if (!order) {
+      return NextResponse.json({ ok: false, error: "order not found" }, { status: 404 });
+    }
 
     if (order.status === "paid") {
-      // идемпотентность: webhook может прийти повторно
       return NextResponse.json({ ok: true, already: true });
     }
 
@@ -54,10 +68,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, ignored: true });
     }
 
-    // помечаем как оплачено
-    await redis.set(`order:${orderId}`, { ...order, status: "paid", paidAt: Date.now() });
+    await redis.set(key, { ...order, status: "paid", paidAt: Date.now() });
 
-    // формируем текст для Telegram
     const itemsText = (order.items || [])
       .map((i: any) => `• ${i.title} × ${i.qty} = ${i.qty * i.price} ₽`)
       .join("\n");
@@ -77,6 +89,9 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true, results });
   } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message || "webhook failed" }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, error: e?.message || "webhook failed" },
+      { status: 500 }
+    );
   }
 }
