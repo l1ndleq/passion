@@ -3,6 +3,13 @@ import Image from "next/image";
 import Link from "next/link";
 import { Providers } from "./providers";
 import { StickyHeader } from "@/components/StickyHeader";
+import dynamic from "next/dynamic";
+
+const SearchBar = dynamic(() => import("@/components/SearchBar"), {
+  ssr: false,
+});
+
+
 
 
 export const metadata = {
@@ -24,15 +31,23 @@ export default function RootLayout({
    <header className="border-b border-black/10">
   <div className="mx-auto max-w-6xl px-5 h-12 flex items-center justify-center">
     <nav className="flex items-center gap-8 text-[11px] uppercase tracking-[0.22em] text-black/60">
-      <Link href="/about" className="relative text-[11px] uppercase tracking-[0.22em] text-black/60 transition-colors hover:text-black after:absolute after:left-0 after:-bottom-1 after:h-[1px] after:w-full after:origin-left after:scale-x-0 after:bg-black/60 after:transition-transform after:duration-300 hover:after:scale-x-100">
-        О бренде
-      </Link>
+    
+    <Link href="/" className="relative text-[11px] uppercase tracking-[0.22em] text-black/60 transition-colors hover:text-black after:absolute after:left-0 after:-bottom-1 after:h-[1px] after:w-full after:origin-left after:scale-x-0 after:bg-black/60 after:transition-transform after:duration-300 hover:after:scale-x-100">
+  Главная
+</Link>
+
+      
       <Link href="/products" className="relative text-[11px] uppercase tracking-[0.22em] text-black/60 transition-colors hover:text-black after:absolute after:left-0 after:-bottom-1 after:h-[1px] after:w-full after:origin-left after:scale-x-0 after:bg-black/60 after:transition-transform after:duration-300 hover:after:scale-x-100">
         Продукты
+      </Link>
+      <Link href="/about" className="relative text-[11px] uppercase tracking-[0.22em] text-black/60 transition-colors hover:text-black after:absolute after:left-0 after:-bottom-1 after:h-[1px] after:w-full after:origin-left after:scale-x-0 after:bg-black/60 after:transition-transform after:duration-300 hover:after:scale-x-100">
+        О бренде
       </Link>
       <Link href="/contact" className="relative text-[11px] uppercase tracking-[0.22em] text-black/60 transition-colors hover:text-black after:absolute after:left-0 after:-bottom-1 after:h-[1px] after:w-full after:origin-left after:scale-x-0 after:bg-black/60 after:transition-transform after:duration-300 hover:after:scale-x-100">
         Контакты
       </Link>
+      <SearchBar className="w-full md:w-[320px]" />
+
     </nav>
   </div>
 </header>
