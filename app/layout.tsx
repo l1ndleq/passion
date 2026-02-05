@@ -18,21 +18,9 @@ export default function RootLayout({
       <body>
         
         <div className="min-h-screen bg-[#fbf7f3] text-[#141414]">
-          <header className="border-b border-black/10">
-           <div className="mx-auto max-w-6xl px-5 py-1.5 flex items-center justify-between">
-            {/* логотип */}
-            <Link href="/" className="flex items-center">
-            <Image
-             src="/brand/logo.png"
-             alt="PASSION"
-            width={88}
-            height={26}
-             priority
-             />
-              </Link>
-
-    {/* меню */}
-    <nav className="flex items-center gap-6 text-xs uppercase tracking-[0.22em] text-black/60">
+   <header className="border-b border-black/10">
+  <div className="mx-auto max-w-6xl px-5 h-12 flex items-center justify-center">
+    <nav className="flex items-center gap-8 text-[11px] uppercase tracking-[0.22em] text-black/60">
       <Link href="/about" className="hover:text-black transition">
         О бренде
       </Link>

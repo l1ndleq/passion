@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { ProductCard } from "@/components/ProductCard";
+import Image from "next/image";
+
 
 type Product = {
   slug: string;
@@ -49,9 +51,18 @@ export default function HomePage() {
               passion / skincare
             </p>
 
-            <h1 className="mt-5 text-[44px] leading-[0.98] md:text-[86px] tracking-[-0.03em] font-light">
-              passion
-            </h1>
+<h1 className="mt-5 text-[44px] leading-[0.98] md:text-[86px] tracking-[-0.03em] font-light">
+  <Image
+    src="/brand/logo.png"
+    alt="PASSION"
+    width={420}
+    height={140}
+    priority
+    className="inline-block align-baseline translate-y-[6px] md:translate-y-[10px]"
+  />
+</h1>
+
+
 
             <p className="mt-6 max-w-xl text-base md:text-lg text-black/70 leading-relaxed">
               Современная косметика для ежедневного ухода. Чистые формулы,
