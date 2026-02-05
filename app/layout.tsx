@@ -1,62 +1,80 @@
 import "./globals.css";
-import Image from "next/image";
 import Link from "next/link";
 import { Providers } from "./providers";
 import { StickyHeader } from "@/components/StickyHeader";
-import dynamic from "next/dynamic";
-
-const SearchBar = dynamic(() => import("@/components/SearchBar"), {
-  ssr: false,
-});
-
-
-
+import SearchBarClientOnly from "@/components/SearchBarClientOnly";
 
 export const metadata = {
   title: "passion",
   description: "Passion cosmetics — minimal beauty",
-}
+};
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+// Важно: layout — Server Component. Не используем Date.now()/new Date() в разметке.
+const CURRENT_YEAR = new Date().getFullYear();
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ru">
       <body>
-        
         <div className="min-h-screen bg-[#fbf7f3] text-[#141414]">
           <StickyHeader>
-   <header className="border-b border-black/10">
-  <div className="mx-auto max-w-6xl px-5 h-12 flex items-center justify-center">
-    <nav className="flex items-center gap-8 text-[11px] uppercase tracking-[0.22em] text-black/60">
-    
-    <Link href="/" className="relative text-[11px] uppercase tracking-[0.22em] text-black/60 transition-colors hover:text-black after:absolute after:left-0 after:-bottom-1 after:h-[1px] after:w-full after:origin-left after:scale-x-0 after:bg-black/60 after:transition-transform after:duration-300 hover:after:scale-x-100">
-  Главная
-</Link>
+            <header className="border-b border-black/10">
+              <div className="mx-auto flex h-12 max-w-6xl items-center justify-between gap-4 px-5">
+                {/* Навигация */}
+                <nav className="flex items-center gap-8 text-[11px] uppercase tracking-[0.22em] text-black/60">
+                  <Link
+                    href="/"
+                    className="relative transition-colors hover:text-black
+                               after:absolute after:left-0 after:-bottom-1 after:h-[1px] after:w-full
+                               after:origin-left after:scale-x-0 after:bg-black/60
+                               after:transition-transform after:duration-300 hover:after:scale-x-100"
+                  >
+                    Главная
+                  </Link>
 
-      
-      <Link href="/products" className="relative text-[11px] uppercase tracking-[0.22em] text-black/60 transition-colors hover:text-black after:absolute after:left-0 after:-bottom-1 after:h-[1px] after:w-full after:origin-left after:scale-x-0 after:bg-black/60 after:transition-transform after:duration-300 hover:after:scale-x-100">
-        Продукты
-      </Link>
-      <Link href="/about" className="relative text-[11px] uppercase tracking-[0.22em] text-black/60 transition-colors hover:text-black after:absolute after:left-0 after:-bottom-1 after:h-[1px] after:w-full after:origin-left after:scale-x-0 after:bg-black/60 after:transition-transform after:duration-300 hover:after:scale-x-100">
-        О бренде
-      </Link>
-      <Link href="/contact" className="relative text-[11px] uppercase tracking-[0.22em] text-black/60 transition-colors hover:text-black after:absolute after:left-0 after:-bottom-1 after:h-[1px] after:w-full after:origin-left after:scale-x-0 after:bg-black/60 after:transition-transform after:duration-300 hover:after:scale-x-100">
-        Контакты
-      </Link>
-      <SearchBar className="w-full md:w-[320px]" />
+                  <Link
+                    href="/products"
+                    className="relative transition-colors hover:text-black
+                               after:absolute after:left-0 after:-bottom-1 after:h-[1px] after:w-full
+                               after:origin-left after:scale-x-0 after:bg-black/60
+                               after:transition-transform after:duration-300 hover:after:scale-x-100"
+                  >
+                    Продукты
+                  </Link>
 
-    </nav>
-  </div>
-</header>
-</StickyHeader>
+                  <Link
+                    href="/about"
+                    className="relative transition-colors hover:text-black
+                               after:absolute after:left-0 after:-bottom-1 after:h-[1px] after:w-full
+                               after:origin-left after:scale-x-0 after:bg-black/60
+                               after:transition-transform after:duration-300 hover:after:scale-x-100"
+                  >
+                    О бренде
+                  </Link>
+
+                  <Link
+                    href="/contact"
+                    className="relative transition-colors hover:text-black
+                               after:absolute after:left-0 after:-bottom-1 after:h-[1px] after:w-full
+                               after:origin-left after:scale-x-0 after:bg-black/60
+                               after:transition-transform after:duration-300 hover:after:scale-x-100"
+                  >
+                    Контакты
+                  </Link>
+                </nav>
+
+                {/* Поиск (справа). На мобиле можно скрыть или сделать компактнее */}
+                <div className="hidden md:block w-[320px]">
+                  <SearchBarClientOnly className="w-full" />
+                </div>
+              </div>
+            </header>
+          </StickyHeader>
 
           <Providers>{children}</Providers>
 
           <footer className="mx-auto max-w-6xl px-5 py-10 text-xs uppercase tracking-[0.22em] text-black/45">
-            © {new Date().getFullYear()} passion
+            © {CURRENT_YEAR} passion
           </footer>
         </div>
       </body>
