@@ -95,14 +95,24 @@ export default function HomePage() {
             </div>
           </div>
 
-          <div className="md:col-span-5">
-            <div className="aspect-[4/5] rounded-[28px] border border-black/10 bg-gradient-to-b from-black/[0.06] to-black/[0.02]" />
-            <p className="mt-4 text-xs uppercase tracking-[0.22em] text-black/55">
-              product texture
-            </p>
-          </div>
-        </div>
+                    <div className="md:col-span-5">
+            <div className="relative h-[520px] w-full overflow-hidden rounded-[32px]">
+              <Image
+                src="/images/hero-texture.jpg"
+                alt="Product texture"
+                fill
+                priority
+                className="object-cover"
+              />
+              <span className="absolute bottom-4 left-4 text-[10px] tracking-[0.22em] text-black/50">
+                PRODUCT TEXTURE
+              </span>
+            </div>
+          </div> {/* ✅ закрыли md:col-span-5 */}
+
+        </div> {/* ✅ закрыли grid */}
       </section>
+
 </Reveal>
 <Reveal>
       {/* ABOUT */}
@@ -213,6 +223,8 @@ export default function HomePage() {
         </div>
       </section>
       </Reveal>
+      
     </main>
-  );
+   );
+
 }
