@@ -12,11 +12,10 @@ function esc(v: any) {
 function getChatIds(): string[] {
   const csv = process.env.TELEGRAM_CHAT_ID ?? "";
 
-  const numbered = Object.keys(process.env)
-    .filter((k) => /^TELEGRAM_CHAT_ID_\d+$/.test(k))
-    .sort((a, b) => Number(a.split("_").pop()) - Number(b.split("_").pop()))
-    .map((k) => (process.env[k] ?? "").trim())
-    .filter(Boolean);
+  const CHAT_IDS = (process.env.TELEGRAM_CHAT_IDS || "")
+  .split(",")
+  .map((id) => id.trim())
+  .filter(Boolean);
 
   const ids = (csv ? csv.split(",") : [])
     .map((s) => s.trim())

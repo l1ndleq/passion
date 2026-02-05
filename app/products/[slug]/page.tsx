@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { AddToCartButton } from "@/app/add-to-cart-button";
+import CartButtonClientOnly from "@/components/CartButtonClientOnly";
+
 
 // Временно: тот же список, что и в products.
 // Позже вынесем в общий файл (например, lib/products.ts)
@@ -95,7 +96,7 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
               {product.price.toLocaleString("ru-RU")} ₽
             </div>
 
-            <AddToCartButton
+            <CartButtonClientOnly
               product={{
                 id: product.id,
                 title: product.title,
@@ -104,14 +105,30 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
             />
           </div>
 
-          <div className="mt-8 flex gap-4 text-sm">
-            <Link href="/products" className="underline underline-offset-4">
-              ← В каталог
-            </Link>
-            <Link href="/cart" className="underline underline-offset-4">
-              Корзина →
-            </Link>
-          </div>
+<div className="mt-6 flex flex-wrap gap-3">
+  <Link
+    href="/products"
+    className="inline-flex items-center justify-center rounded-full
+               border border-neutral-300 bg-white/60 backdrop-blur
+               px-5 py-2.5 text-sm font-semibold tracking-wide text-neutral-900
+               transition-[background-color,transform] duration-300
+               hover:bg-neutral-100 active:scale-[0.98]"
+  >
+    ← В каталог
+  </Link>
+
+  <Link
+    href="/cart"
+    className="inline-flex items-center justify-center rounded-full
+               bg-neutral-900 px-6 py-2.5
+               text-sm font-semibold tracking-wide text-white
+               transition-[background-color,transform] duration-300
+               hover:bg-neutral-800 active:scale-[0.98]"
+  >
+    Корзина →
+  </Link>
+</div>
+
         </div>
       </div>
     </main>

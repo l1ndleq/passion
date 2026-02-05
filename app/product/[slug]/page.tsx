@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { AddToCartButton } from "@/app/add-to-cart-button";
+import AddToCartButton from "@/components/add-to-cart-button";
+import { ProductCard } from "@/components/ProductCard";
+import type { Metadata } from "next";
+
+
 
 type Product = {
   id: string;
@@ -48,6 +52,53 @@ const PRODUCTS: Product[] = [
     details: ["Обновляет текстуру кожи", "Тонизирует", "Ровный, гладкий рельеф"],
   },
 ];
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+
+  const product = PRODUCTS.find((p) => p.id === slug);
+
+  if (!product) {
+    return {
+      title: "Товар не найден — PASSION",
+      description: "Страница товара не найдена.",
+    };
+  }
+
+  const titleParts = [
+    product.title,
+    product.volume ? `· ${product.volume}` : null,
+    "— PASSION",
+  ].filter(Boolean);
+
+  const title = titleParts.join(" ");
+  const description =
+    product.description?.trim() ||
+    "Современная косметика PASSION для ежедневного ухода.";
+
+  return {
+    title,
+    description,
+  openGraph: {
+  title,
+  description,
+  images: product.image ? [{ url: product.image }] : undefined,
+  type: "website",
+},
+
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: product.image ? [product.image] : undefined,
+    },
+  };
+}
+
 
 export default async function ProductPage({
   params,
@@ -162,14 +213,30 @@ export default async function ProductPage({
             </p>
           </div>
 
-          <div className="mt-6 flex gap-4 text-sm text-black/70">
-            <Link href="/products" className="underline underline-offset-4">
-              ← В каталог
-            </Link>
-            <Link href="/cart" className="underline underline-offset-4">
-              Корзина →
-            </Link>
-          </div>
+       <div className="mt-6 flex flex-wrap gap-3">
+  <Link
+    href="/products"
+    className="inline-flex items-center justify-center rounded-full
+               border border-neutral-300 bg-white/60 backdrop-blur
+               px-5 py-2.5 text-sm font-semibold tracking-wide text-neutral-900
+               transition-[background-color,transform] duration-300
+               hover:bg-neutral-100 active:scale-[0.98]"
+  >
+    ← В каталог
+  </Link>
+
+  <Link
+    href="/cart"
+    className="inline-flex items-center justify-center rounded-full
+               bg-neutral-900 px-6 py-2.5
+               text-sm font-semibold tracking-wide text-white
+               transition-[background-color,transform] duration-300
+               hover:bg-neutral-800 active:scale-[0.98]"
+  >
+    Корзина →
+  </Link>
+</div>
+
         </div>
       </section>
 
@@ -186,42 +253,49 @@ export default async function ProductPage({
               </p>
             </div>
 
-            <Link
-              href="/products"
-              className="hidden md:inline-block text-sm underline underline-offset-4 hover:opacity-70 transition"
-            >
-              Смотреть все
-            </Link>
+<Link
+  href="/products"
+  className="inline-flex items-center justify-center rounded-full
+             bg-neutral-900 px-6 py-3
+             text-sm font-semibold tracking-wide text-white
+             transition-[background-color,transform,opacity] duration-300 ease-out
+             hover:bg-neutral-800 active:scale-[0.98]"
+>
+  Смотреть все →
+</Link>
+
+
           </div>
 
-          <div className="mt-8 grid gap-5 md:grid-cols-3">
-            {related.map((p) => (
-              <Link
-                key={p.id}
-                href={`/product/${p.id}`}
-                className="group rounded-3xl border border-black/10 bg-white/60 p-5 shadow-sm transition-all duration-300 ease-out hover:-translate-y-0.5 hover:shadow-md"
-              >
-                <div className="text-[10px] tracking-[0.22em] uppercase text-black/55">
-                  {p.tag || "Care"}
-                </div>
-                <div className="mt-3 text-lg font-light">{p.title}</div>
-                <div className="mt-2 text-sm text-black/65">{p.volume}</div>
-                <div className="mt-4 text-sm text-black/70 line-clamp-2">
-                  {p.description}
-                </div>
-                <div className="mt-6 text-sm underline underline-offset-4 text-black/70 opacity-0 group-hover:opacity-100 transition-opacity">
-                  Перейти →
-                </div>
-              </Link>
-            ))}
-          </div>
+     <div className="mt-8 grid gap-5 md:grid-cols-3">
+  {related.map((p) => (
+    <ProductCard
+      key={p.id}
+      href={`/product/${p.id}`}
+      title={p.volume ? `${p.title} · ${p.volume}` : p.title}
+      price={p.price}
+      image={p.image || "/images/placeholder-product.jpg"}
+      badge={p.tag || "Care"}
+      actions={
+     <span
+  className="inline-flex items-center justify-center rounded-full
+             bg-neutral-900 px-4 py-2
+             text-xs font-semibold tracking-wide text-white
+             transition-[background-color,transform,opacity] duration-300 ease-out
+             group-hover:bg-neutral-800 group-hover:opacity-95
+             group-active:scale-[0.98]"
+>
+  Перейти →
+</span>
 
-          <Link
-            href="/products"
-            className="mt-6 inline-block md:hidden text-sm underline underline-offset-4"
-          >
-            Смотреть все
-          </Link>
+      }
+    />
+  ))}
+</div>
+
+
+
+
         </section>
       ) : null}
     </main>

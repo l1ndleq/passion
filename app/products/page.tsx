@@ -1,6 +1,9 @@
 import Link from "next/link";
-import { AddToCartButton } from "../add-to-cart-button";
+import AddToCartButton from "@/components/add-to-cart-button";
 import { ProductCard } from "@/components/ProductCard";
+import CartButton from "@/components/CartButton";
+import { Suspense } from "react";
+import ProductsGridClient from "@/components/ProductsGridClient";
 
 type Product = {
   id: string;
@@ -60,34 +63,15 @@ export default function ProductsPage() {
         </div>
 
         <div className="flex items-center gap-4">
-          <Link href="/cart" className="text-sm underline underline-offset-4">
-            Корзина
-          </Link>
+          <CartButton />
         </div>
       </div>
 
-      {/* Grid */}
-      <div className="mt-10 grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {PRODUCTS.map((p, idx) => (
-          <ProductCard
-            key={p.id}
-            href={`/product/${p.id}`}
-            title={p.volume ? `${p.title} · ${p.volume}` : p.title}
-            price={p.price}
-            image={
-              p.image ||
-              (idx % 2 === 0
-                ? "/images/placeholder-product.jpg"
-                : "/images/placeholder-product.jpg")
-            }
-            badge={p.tag || undefined}
-            actions={
-              <AddToCartButton
-                product={{ id: p.id, title: p.title, price: p.price }}
-              />
-            }
-          />
-        ))}
+      {/* Grid (with search) */}
+      <div className="mt-10">
+        <Suspense fallback={null}>
+          <ProductsGridClient products={PRODUCTS} />
+        </Suspense>
       </div>
 
       {/* Bottom info */}
@@ -104,14 +88,22 @@ export default function ProductsPage() {
         <div className="mt-5 flex flex-wrap gap-3">
           <Link
             href="/cart"
-            className="rounded-full bg-black px-5 py-3 text-sm font-medium text-white hover:opacity-90"
+            className="inline-flex items-center justify-center rounded-full
+                       bg-neutral-900 px-6 py-3
+                       text-sm font-semibold tracking-wide text-white
+                       transition-[background-color,transform,opacity] duration-300 ease-out
+                       hover:bg-neutral-800 active:scale-[0.98]"
           >
-            Перейти в корзину
+            Перейти в корзину →
           </Link>
 
           <Link
             href="/checkout"
-            className="rounded-full border border-black/10 bg-white px-5 py-3 text-sm font-medium hover:bg-black/[0.03]"
+            className="inline-flex items-center justify-center rounded-full
+                       border border-neutral-300 bg-white/60 backdrop-blur
+                       px-6 py-3 text-sm font-semibold tracking-wide text-neutral-900
+                       transition-[background-color,transform] duration-300
+                       hover:bg-neutral-100 active:scale-[0.98]"
           >
             Оформление
           </Link>

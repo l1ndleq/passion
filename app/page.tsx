@@ -79,12 +79,7 @@ export default function HomePage() {
               >
                 Каталог
               </Link>
-              <Link
-                href="/contact"
-                className="rounded-full border border-black/15 px-7 py-3 text-xs tracking-[0.22em] uppercase transition-all duration-300 hover:border-black/30 hover:bg-black/[0.03] hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98]"
-              >
-                Связаться
-              </Link>
+        
             </div>
 
             <div className="mt-10 flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-[0.22em] text-black/50">
@@ -145,12 +140,18 @@ export default function HomePage() {
             </p>
           </div>
 
-          <Link
-            href="/products"
-            className="hidden md:inline-block text-sm underline underline-offset-4 hover:opacity-70 transition"
-          >
-            Смотреть все
-          </Link>
+<Link
+  href="/products"
+  className="inline-flex items-center justify-center rounded-full
+             bg-neutral-900 px-6 py-3
+             text-sm font-semibold tracking-wide text-white
+             transition-[background-color,transform,opacity] duration-300 ease-out
+             hover:bg-neutral-800 active:scale-[0.98]"
+>
+  Смотреть все →
+</Link>
+
+
         </div>
 
 <div className="mt-10 grid gap-5 md:grid-cols-3">
@@ -163,20 +164,25 @@ export default function HomePage() {
   image={"/images/placeholder-product.jpg"}
   badge={p.category}
   actions={
-    <span className="text-xs underline underline-offset-4 text-black/70 hover:opacity-70 transition">
-      Перейти
-    </span>
+   <span
+  className="inline-flex items-center justify-center rounded-full
+             bg-neutral-900 px-4 py-2
+             text-xs font-semibold tracking-wide text-white
+             transition-[background-color,transform,opacity] duration-300 ease-out
+             group-hover:bg-neutral-800 group-hover:opacity-95
+             group-active:scale-[0.98]"
+>
+  Перейти →
+</span>
+
   }
 />
   ))}
 </div>
 
-        <Link
-          href="/products"
-          className="mt-8 inline-block md:hidden text-sm underline underline-offset-4"
-        >
-          Смотреть все
-        </Link>
+
+
+
       </section>
 </Reveal>
 <Reveal>
