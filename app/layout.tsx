@@ -24,10 +24,12 @@ export default function RootLayout({
       <Link href="/about" className="hover:text-black transition">
         О бренде
       </Link>
-      <Link href="/products" className="hover:text-black transition">
+      <Link href="/products" className="relative text-[11px] uppercase tracking-[0.22em] text-black/60 transition-colors hover:text-black
+after:absolute after:left-0 after:-bottom-1 after:h-[1px] after:w-full after:origin-left after:scale-x-0 after:bg-black/60 after:transition-transform after:duration-300 hover:after:scale-x-100">
         Продукты
       </Link>
-      <Link href="/contact" className="hover:text-black transition">
+      <Link href="/contact" className="relative text-[11px] uppercase tracking-[0.22em] text-black/60 transition-colors hover:text-black
+after:absolute after:left-0 after:-bottom-1 after:h-[1px] after:w-full after:origin-left after:scale-x-0 after:bg-black/60 after:transition-transform after:duration-300 hover:after:scale-x-100">
         Контакты
       </Link>
     </nav>

@@ -78,7 +78,7 @@ export default function HomePage() {
               </Link>
               <Link
                 href="/contact"
-                className="rounded-full border border-black/15 px-6 py-3 text-sm tracking-wide uppercase hover:border-black/30 transition"
+                className="rounded-full border border-black/15 px-7 py-3 text-xs tracking-[0.22em] uppercase transition-all duration-300 hover:border-black/30 hover:bg-black/[0.03] hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98]"
               >
                 Связаться
               </Link>

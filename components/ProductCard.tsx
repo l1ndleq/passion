@@ -24,7 +24,7 @@ export function ProductCard({
   const img = image?.trim() || "/images/placeholder-product.jpg";
 
   return (
-    <div className="group overflow-hidden rounded-2xl border border-black/10 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+    <div className="group overflow-hidden rounded-2xl border border-black/10 bg-white shadow-sm transition-all duration-300 ease-out hover:-translate-y-0.5 hover:shadow-md">
       <Link href={href} className="block">
         {/* image */}
         <div className="relative h-[220px] w-full bg-black/[0.03] sm:h-[240px]">
@@ -32,7 +32,7 @@ export function ProductCard({
             src={img}
             alt={title}
             fill
-            className="object-cover"
+            className="h-[220px] w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.03]"
             sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
           />
           {badge ? (
@@ -61,13 +61,15 @@ export function ProductCard({
             {/* actions */}
             {actions ? (
               <div
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                }}
-              >
-                {actions}
-              </div>
+  className="transition-all duration-300 ease-out md:opacity-0 md:translate-y-1 md:group-hover:opacity-100 md:group-hover:translate-y-0"
+  onClick={(e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }}
+>
+  {actions}
+</div>
+
             ) : null}
           </div>
         </div>
