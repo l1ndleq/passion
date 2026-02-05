@@ -5,6 +5,8 @@ import CartButton from "@/components/CartButton";
 import { Suspense } from "react";
 import ProductsGridClient from "@/components/ProductsGridClient";
 
+
+
 type Product = {
   id: string;
   title: string;

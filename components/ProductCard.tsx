@@ -60,17 +60,11 @@ export function ProductCard({
 
             {/* actions */}
             {actions ? (
-              <div
-  className="transition-all duration-300 ease-out md:opacity-0 md:translate-y-1 md:group-hover:opacity-100 md:group-hover:translate-y-0"
-  onClick={(e) => {
-    e.preventDefault();
-    e.stopPropagation();
-  }}
->
-  {actions}
-</div>
+  <div className="transition-all duration-300 ease-out md:opacity-0 md:translate-y-1 md:group-hover:opacity-100 md:group-hover:translate-y-0">
+    {actions}
+  </div>
+) : null}
 
-            ) : null}
           </div>
         </div>
       </Link>
