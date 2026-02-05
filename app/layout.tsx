@@ -3,6 +3,8 @@ import Link from "next/link";
 import { Providers } from "./providers";
 import { StickyHeader } from "@/components/StickyHeader";
 import SearchBarClientOnly from "@/components/SearchBarClientOnly";
+import MobileSearch from "@/components/MobileSearch";
+
 
 export const metadata = {
   title: "passion",
@@ -67,6 +69,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <div className="hidden md:block w-[320px]">
                   <SearchBarClientOnly className="w-full" />
                 </div>
+                <div className="flex items-center gap-2">
+  {/* mobile search icon */}
+  <div className="md:hidden">
+    <MobileSearch />
+  </div>
+
+  {/* desktop search input */}
+  <div className="hidden md:block w-[320px]">
+    <SearchBarClientOnly className="w-full" />
+  </div>
+</div>
+
               </div>
             </header>
           </StickyHeader>
