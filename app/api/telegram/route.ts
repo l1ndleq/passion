@@ -8,21 +8,22 @@ function esc(v: any) {
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;");
 }
-
-function getChatIds(): string[] {
-  const csv = process.env.TELEGRAM_CHAT_ID ?? "";
-
-  const CHAT_IDS = (process.env.TELEGRAM_CHAT_IDS || "")
-  .split(",")
-  .map((id) => id.trim())
-  .filter(Boolean);
-
-  const ids = (csv ? csv.split(",") : [])
+function getChatIds() {
+  const fromList = (process.env.TELEGRAM_CHAT_IDS || "")
+    .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
 
-  return Array.from(new Set([...ids, ...numbered]));
+  const numbered = Object.keys(process.env)
+    .filter((k) => /^TELEGRAM_CHAT_ID\d+$/.test(k))
+    .map((k) => (process.env[k] || "").trim())
+    .filter(Boolean);
+
+  return Array.from(new Set([...fromList, ...numbered]));
 }
+
+const chatIds = getChatIds();
+
 
 export async function POST(req: Request) {
   try {
