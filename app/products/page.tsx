@@ -71,7 +71,7 @@ export default function ProductsPage() {
         {PRODUCTS.map((p, idx) => (
           <ProductCard
             key={p.id}
-            href={`/products/${p.id}`}
+            href={`/product/${p.id}`}
             title={p.volume ? `${p.title} · ${p.volume}` : p.title}
             price={p.price}
             image={

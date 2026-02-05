@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { ProductCard } from "@/components/ProductCard";
 import Image from "next/image";
+import { Reveal } from "@/components/Reveal";
+
 
 
 type Product = {
@@ -43,6 +45,7 @@ const featured: Product[] = [
 export default function HomePage() {
   return (
     <main>
+      <Reveal>
       {/* HERO */}
       <section className="mx-auto max-w-6xl px-5 pt-16 pb-16 md:pt-28 md:pb-24">
         <div className="grid md:grid-cols-12 gap-10 items-end">
@@ -105,7 +108,8 @@ export default function HomePage() {
           </div>
         </div>
       </section>
-
+</Reveal>
+<Reveal>
       {/* ABOUT */}
       <section className="mx-auto max-w-6xl px-5 pb-14 md:pb-20">
         <div className="grid md:grid-cols-12 gap-10 items-start">
@@ -127,7 +131,8 @@ export default function HomePage() {
           </div>
         </div>
       </section>
-
+</Reveal>
+<Reveal>
       {/* PRODUCTS */}
       <section className="mx-auto max-w-6xl px-5 py-16 md:py-24">
         <div className="flex items-end justify-between gap-6">
@@ -173,7 +178,8 @@ export default function HomePage() {
           Смотреть все
         </Link>
       </section>
-
+</Reveal>
+<Reveal>
       {/* CTA */}
       <section className="mx-auto max-w-6xl px-5 pb-24">
         <div className="rounded-[32px] border border-black/10 bg-white/30 p-8 md:p-12">
@@ -200,6 +206,7 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+      </Reveal>
     </main>
   );
 }
