@@ -1,6 +1,7 @@
 "use client";
 
-import { AddToCartButton } from "./add-to-cart-button";
+import AddToCartButton from "@/components/add-to-cart-button";
+
 
 export function ProductCard({
   product,
