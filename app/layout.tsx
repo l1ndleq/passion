@@ -5,13 +5,12 @@ import { StickyHeader } from "@/components/StickyHeader";
 import SearchBarClientOnly from "@/components/SearchBarClientOnly";
 import MobileSearch from "@/components/MobileSearch";
 
-
 export const metadata = {
   title: "passion",
   description: "Passion cosmetics — minimal beauty",
 };
 
-// Важно: layout — Server Component. Не используем Date.now()/new Date() в разметке.
+// layout — Server Component
 const CURRENT_YEAR = new Date().getFullYear();
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -20,10 +19,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <div className="min-h-screen bg-[#fbf7f3] text-[#141414]">
           <StickyHeader>
-            <header className="border-b border-black/10">
-              <div className="mx-auto flex h-12 max-w-6xl items-center justify-between gap-4 px-5">
-                {/* Навигация */}
-                <nav className="flex items-center gap-8 text-[11px] uppercase tracking-[0.22em] text-black/60">
+            <header className="border-b border-black/10 bg-white/60 backdrop-blur">
+              <div className="mx-auto flex h-12 max-w-6xl items-center px-5">
+                {/* ЛЕВО — навигация */}
+                <nav className="flex shrink-0 items-center gap-8 text-[11px] uppercase tracking-[0.22em] text-black/60">
                   <Link
                     href="/"
                     className="relative transition-colors hover:text-black
@@ -65,22 +64,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   </Link>
                 </nav>
 
-                {/* Поиск (справа). На мобиле можно скрыть или сделать компактнее */}
-                <div className="hidden md:block w-[320px]">
+                {/* СПЕЙСЕР */}
+                <div className="flex-1" />
+
+                {/* ПРАВО — поиск (вторая половина) */}
+                <div className="hidden md:flex w-[560px] max-w-[50%]">
                   <SearchBarClientOnly className="w-full" />
                 </div>
-                <div className="flex items-center gap-2">
-  {/* mobile search icon */}
-  <div className="md:hidden">
-    <MobileSearch />
-  </div>
 
-  {/* desktop search input */}
-  <div className="hidden md:block w-[320px]">
-    <SearchBarClientOnly className="w-full" />
-  </div>
-</div>
-
+                {/* mobile search icon */}
+                <div className="md:hidden">
+                  <MobileSearch />
+                </div>
               </div>
             </header>
           </StickyHeader>
