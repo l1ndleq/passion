@@ -168,7 +168,7 @@ export default function HomePage() {
   {featured.map((p, idx) => (
  <ProductCard
   key={p.slug}
-  href={`/product/${p.slug}`}
+  href={`/products/${p.slug}`}
   title={`${p.name} · ${p.subtitle}`}
   price={0}
   image={"/images/placeholder-product.jpg"}

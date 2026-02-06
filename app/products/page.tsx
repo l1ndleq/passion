@@ -1,50 +1,15 @@
 import Link from "next/link";
-import AddToCartButton from "@/components/add-to-cart-button";
-import { ProductCard } from "@/components/ProductCard";
-import CartButton from "@/components/CartButton";
 import { Suspense } from "react";
+import CartButtonClientOnly from "@/components/CartButtonClientOnly";
 import ProductsGridClient from "@/components/ProductsGridClient";
 
 
-
-type Product = {
-  id: string;
-  title: string;
-  price: number;
-  description?: string;
-  volume?: string; // например "150 ml"
-  tag?: string; // например "New"
-  image?: string; // опционально (если потом появятся реальные картинки)
-};
-
-const PRODUCTS: Product[] = [
-  {
-    id: "soft-cream",
-    title: "Soft Cream",
-    price: 1490,
-    volume: "150 ml",
-    description: "Нежный крем для ежедневного ухода и восстановления.",
-    tag: "Bestseller",
-    // image: "/images/soft-cream.jpg",
-  },
-  {
-    id: "body-oil",
-    title: "Body Oil",
-    price: 1290,
-    volume: "100 ml",
-    description: "Питательное масло для тела — мягкость и сияние кожи.",
-    // image: "/images/body-oil.jpg",
-  },
-  {
-    id: "scrub",
-    title: "Scrub",
-    price: 990,
-    volume: "200 ml",
-    description: "Скраб для гладкости: обновление и тонус.",
-    tag: "New",
-    // image: "/images/scrub.jpg",
-  },
+const PRODUCTS = [
+  { id: "soft-cream", title: "Soft Cream", price: 1490 },
+  { id: "body-oil", title: "Body Oil", price: 1290 },
+  { id: "scrub", title: "Scrub", price: 990 },
 ];
+
 
 export default function ProductsPage() {
   return (
@@ -65,7 +30,8 @@ export default function ProductsPage() {
         </div>
 
         <div className="flex items-center gap-4">
-          <CartButton />
+          <CartButtonClientOnly />
+
         </div>
       </div>
 

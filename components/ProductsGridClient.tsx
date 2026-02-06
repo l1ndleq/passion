@@ -1,57 +1,49 @@
 "use client";
 
-import { useMemo } from "react";
-import { useSearchParams } from "next/navigation";
+import { useState } from "react";
 import { ProductCard } from "@/components/ProductCard";
-import AddToCartButton from "@/components/add-to-cart-button";
 
 type Product = {
   id: string;
   title: string;
   price: number;
-  description?: string;
-  volume?: string;
-  tag?: string;
   image?: string;
+  tag?: string;
 };
 
-export default function ProductsGridClient({ products }: { products: Product[] }) {
-  const sp = useSearchParams();
-  const q = (sp.get("q") || "").trim().toLowerCase();
+export default function ProductsGridClient({
+  products,
+}: {
+  products: Product[];
+}) {
+  const [query, setQuery] = useState("");
 
-  const filtered = useMemo(() => {
-    if (!q) return products;
-    return products.filter((p) => {
-      const hay = `${p.title} ${p.description ?? ""} ${p.tag ?? ""} ${p.volume ?? ""}`.toLowerCase();
-      return hay.includes(q);
-    });
-  }, [products, q]);
-
-  if (!filtered.length) {
-    return (
-      <div className="rounded-3xl border border-black/5 bg-white/60 p-8 text-center shadow-sm backdrop-blur">
-        <div className="text-lg font-semibold">Ничего не найдено</div>
-        <div className="mt-2 text-sm opacity-70">Попробуй другой запрос.</div>
-      </div>
-    );
-  }
+  const filtered = products.filter((p) =>
+    p.title.toLowerCase().includes(query.toLowerCase())
+  );
 
   return (
-    <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {filtered.map((p, idx) => (
-        <ProductCard
-          key={p.id}
-          href={`/product/${p.id}`}
-          title={p.volume ? `${p.title} · ${p.volume}` : p.title}
-          price={p.price}
-          image={
-            p.image ||
-            (idx % 2 === 0 ? "/images/placeholder-product.jpg" : "/images/placeholder-product.jpg")
-          }
-          badge={p.tag || undefined}
-          actions={<AddToCartButton product={{ id: p.id, title: p.title, price: p.price }} />}
-        />
-      ))}
-    </div>
+   // <>
+    //  {/* search */}
+    //  <input
+    //    value={query}
+    //    onChange={(e) => setQuery(e.target.value)}
+   //     placeholder="Поиск..."
+     //   className="mb-6 w-full rounded-xl border px-4 py-3"
+//      /> 
+
+ //     {/* grid */}
+      <div className="grid gap-5 sm:grid-cols-2 md:grid-cols-3">
+        {filtered.map((p) => (
+          <ProductCard
+            key={p.id}
+            href={`/products/${p.id}`}
+            title={p.title}
+            price={p.price}
+            image={p.image}
+            badge={p.tag}
+          />
+        ))}
+      </div>
   );
 }

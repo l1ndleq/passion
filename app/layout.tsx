@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Providers } from "./providers";
 import { StickyHeader } from "@/components/StickyHeader";
 import SearchBarClientOnly from "@/components/SearchBarClientOnly";
-import MobileSearch from "@/components/MobileSearch";
+import MobileSearchClientOnly from "@/components/MobileSearchClientOnly";
 
 export const metadata = {
   title: "passion",
@@ -74,7 +74,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
                 {/* mobile search icon */}
                 <div className="md:hidden">
-                  <MobileSearch />
+                  <MobileSearchClientOnly />
                 </div>
               </div>
             </header>

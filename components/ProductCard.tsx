@@ -4,6 +4,25 @@ import Image from "next/image";
 import Link from "next/link";
 import { ReactNode } from "react";
 
+export type Product = {
+  id: string;
+  title: string;
+  price: number;
+  description?: string;
+  volume?: string;
+  tag?: string;
+  image?: string;
+};
+
+export const PRODUCTS: Product[] = [
+  { id: "silk-cleanser", title: "Silk Cleanser", price: 1490, tag: "New" },
+  { id: "glow-serum", title: "Glow Serum", price: 1690, tag: "Bestseller" },
+  { id: "soft-cream", title: "Soft Cream", price: 1490 },
+  { id: "body-oil", title: "Body Oil", price: 1290 },
+  { id: "scrub", title: "Scrub", price: 990, tag: "New" },
+];
+
+
 type ProductCardProps = {
   href: string;
   title: string;
