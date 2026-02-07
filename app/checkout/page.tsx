@@ -1,13 +1,24 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useCart } from "../cart-context";
+
+const normalizePhone = (s: string) => String(s ?? "").replace(/[^\d+]/g, "").trim();
+
+// простая проверка: 10–15 цифр
+const isValidPhone = (raw: string) => {
+  const p = normalizePhone(raw);
+  const digits = p.replace(/\D/g, "");
+  return digits.length >= 10 && digits.length <= 15;
+};
 
 export default function CheckoutPage() {
   const { items, totalPrice } = useCart();
 
   const [name, setName] = useState("");
-  const [contact, setContact] = useState("");
+  const [phone, setPhone] = useState(""); // ✅ обязательный
+  const [telegram, setTelegram] = useState(""); // ✅ опциональный
+
   const [city, setCity] = useState("");
   const [address, setAddress] = useState("");
   const [message, setMessage] = useState("");
@@ -15,15 +26,28 @@ export default function CheckoutPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // ✅ показываем сохранённый debug после перезагрузки
-
   async function submit() {
     if (!items.length) {
       setError("Корзина пуста");
       return;
     }
-    if (!name || !contact) {
-      setError("Укажите имя и контакт");
+
+    const nameTrim = name.trim();
+    const phoneTrim = phone.trim();
+    const telegramTrim = telegram.trim().replace(/^@/, "");
+
+    if (!nameTrim) {
+      setError("Укажите имя");
+      return;
+    }
+
+    if (!phoneTrim) {
+      setError("Укажите номер телефона");
+      return;
+    }
+
+    if (!isValidPhone(phoneTrim)) {
+      setError("Введите корректный номер телефона");
       return;
     }
 
@@ -35,12 +59,20 @@ export default function CheckoutPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          customer: { name, contact, city, address, message },
+          customer: {
+            name: nameTrim,
+            phone: normalizePhone(phoneTrim), // ✅ нормализованный
+            telegram: telegramTrim || null, // ✅ опционально
+            city: city.trim(),
+            address: address.trim(),
+            message: message.trim(),
+          },
           items: items.map((i) => ({
             id: i.id,
             title: i.title,
             price: i.price,
             qty: i.qty,
+            image: i.image, // если есть
           })),
           totalPrice,
         }),
@@ -48,10 +80,12 @@ export default function CheckoutPage() {
 
       const data = await res.json().catch(() => null);
 
-      // ✅ сохраняем ВСЁ, чтобы увидеть даже после “обновления”
-  
-
       if (!res.ok || !data?.ok) {
+        // поддержка кодов ошибок из API
+        if (data?.error === "NAME_REQUIRED") throw new Error("Укажите имя");
+        if (data?.error === "PHONE_REQUIRED") throw new Error("Укажите номер телефона");
+        if (data?.error === "PHONE_INVALID") throw new Error("Введите корректный номер телефона");
+
         throw new Error(data?.error || "Не удалось создать оплату");
       }
 
@@ -63,10 +97,7 @@ export default function CheckoutPage() {
         ? data.paymentUrl
         : `${window.location.origin}${data.paymentUrl}`;
 
-      // ✅ даём 1 секунду, чтобы ты успел увидеть debug на странице
-      setTimeout(() => {
-        window.location.assign(url);
-      }, 1000);
+      window.location.assign(url);
     } catch (e: any) {
       setError(e?.message || "Ошибка оформления заказа");
     } finally {
@@ -96,9 +127,7 @@ export default function CheckoutPage() {
                 {item.qty} × {item.price} ₽
               </div>
             </div>
-            <div className="text-sm font-semibold">
-              {item.qty * item.price} ₽
-            </div>
+            <div className="text-sm font-semibold">{item.qty * item.price} ₽</div>
           </div>
         ))}
 
@@ -111,16 +140,28 @@ export default function CheckoutPage() {
       {/* Форма */}
       <div className="mt-8 space-y-4">
         <input
-          placeholder="Имя"
+          placeholder="Имя *"
           value={name}
           onChange={(e) => setName(e.target.value)}
           className="w-full border rounded-xl px-4 py-3 text-sm"
+          required
+          autoComplete="name"
         />
 
         <input
-          placeholder="Телефон / Telegram"
-          value={contact}
-          onChange={(e) => setContact(e.target.value)}
+          placeholder="Телефон *"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          className="w-full border rounded-xl px-4 py-3 text-sm"
+          required
+          inputMode="tel"
+          autoComplete="tel"
+        />
+
+        <input
+          placeholder="Telegram (необязательно)"
+          value={telegram}
+          onChange={(e) => setTelegram(e.target.value)}
           className="w-full border rounded-xl px-4 py-3 text-sm"
         />
 

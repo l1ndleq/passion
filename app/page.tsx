@@ -30,7 +30,7 @@ const featured: Product[] = [
     name: "Glow Serum",
     subtitle: "Daily Radiance",
     category: "Сыворотка",
-    note: "Ровный тон и естественное сияние без утяжеления.",
+    note: "Лёгкая формула для ровного тона и естественного сияния кожи.",
     badge: "Bestseller",
   },
   {
@@ -68,8 +68,9 @@ export default function HomePage() {
 
 
             <p className="mt-6 max-w-xl text-base md:text-lg text-black/70 leading-relaxed">
-              Современная косметика для ежедневного ухода. Чистые формулы,
-              мягкие текстуры и спокойная уверенность в результате.
+              Современный уход для повседневной жизни. 
+              Чистые формулы, мягкие текстуры и спокойная уверенность в результате.
+
             </p>
 
             <div className="mt-10 flex items-center gap-3">
@@ -84,13 +85,13 @@ export default function HomePage() {
 
             <div className="mt-10 flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-[0.22em] text-black/50">
               <span className="rounded-full border border-black/10 px-3 py-2 bg-white/30">
-                clean formulas
+                Чистые формулы
               </span>
               <span className="rounded-full border border-black/10 px-3 py-2 bg-white/30">
-                soft textures
+                Мягкие текстуры
               </span>
               <span className="rounded-full border border-black/10 px-3 py-2 bg-white/30">
-                daily care
+                Ежедневный уход
               </span>
             </div>
           </div>
@@ -123,15 +124,15 @@ export default function HomePage() {
           </h2>
           <div className="md:col-span-8">
             <p className="text-lg md:text-xl leading-relaxed text-black/75">
-              Passion — это уход, встроенный в ритм жизни. Мы создаём продукты,
-              которые легко использовать каждый день, не перегружая кожу и
-              пространство вокруг.
+              Passion — это уход, встроенный в ритм жизни. 
+              Мы создаём средства, которые легко использовать каждый день — 
+              без перегруженных формул и лишних деталей.
             </p>
             <Link
               href="/about"
               className="mt-6 inline-block text-sm underline underline-offset-4 text-black/70 hover:text-black transition"
             >
-              Подробнее о бренде
+              Узнать больше о бренде →
             </Link>
           </div>
         </div>
@@ -146,7 +147,7 @@ export default function HomePage() {
               Ассортимент
             </h2>
             <p className="mt-3 max-w-md text-sm md:text-base text-black/60">
-              Базовые средства для продуманного ежедневного ухода.
+              Базовые средства для продуманного ежедневного ухода за кожей.
             </p>
           </div>
 

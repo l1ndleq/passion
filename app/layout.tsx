@@ -6,6 +6,20 @@ import SearchBarClientOnly from "@/components/SearchBarClientOnly";
 import MobileSearchClientOnly from "@/components/MobileSearchClientOnly";
 import CartButton from "@/components/CartButton";
 import CartLinkClientOnly from "@/components/CartLinkClientOnly";
+import { Inter, Cormorant_Garamond } from "next/font/google";
+
+const inter = Inter({
+  subsets: ["latin", "cyrillic"],
+  variable: "--font-inter",
+  display: "swap",
+});
+
+const cormorant = Cormorant_Garamond({
+  subsets: ["latin", "cyrillic"],
+  weight: ["400", "500", "600"],
+  variable: "--font-cormorant",
+  display: "swap",
+});
 
 
 
@@ -19,7 +33,7 @@ const CURRENT_YEAR = new Date().getFullYear();
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ru">
+    <html lang="ru" className={`${inter.variable} ${cormorant.variable}`}>
       <body>
         <AppProviders>
         <div className="min-h-screen bg-[#fbf7f3] text-[#141414]">

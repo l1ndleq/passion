@@ -15,9 +15,9 @@ export default function CartPage() {
             <span className="text-2xl">🛍️</span>
           </div>
 
-          <h1 className="text-2xl font-semibold">Корзина пустая</h1>
+          <h1 className="text-2xl font-semibold">В вашей корзине пока пусто</h1>
           <p className="mt-2 text-neutral-600">
-            Добавь товары из каталога — и они появятся здесь.
+            Добавьте средства из каталога — и они появятся здесь.
           </p>
 
           <div className="mt-6">
@@ -157,7 +157,7 @@ export default function CartPage() {
               href="/checkout"
               className="mt-5 block w-full rounded-2xl bg-black px-5 py-3 text-center text-white hover:opacity-90"
             >
-              Перейти к оформлению
+              Оформить заказ
             </Link>
 
             <p className="mt-3 text-xs text-neutral-500">

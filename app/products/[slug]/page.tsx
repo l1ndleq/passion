@@ -84,7 +84,7 @@ export default async function ProductPage({
                          transition-[background-color,transform] duration-300
                          hover:bg-neutral-100 active:scale-[0.98]"
             >
-              ← В каталог
+              ← Вернуться в каталог
             </Link>
 
             <AddToCartButton
@@ -96,14 +96,14 @@ export default async function ProductPage({
             <section className="mt-16">
               <div className="mb-6 flex items-end justify-between gap-4">
                 <h2 className="text-lg md:text-xl font-semibold tracking-[-0.02em]">
-                  Другие товары
+                  Вам также может понравиться
                 </h2>
 
                 <Link
                   href="/products"
                   className="text-xs tracking-[0.22em] uppercase text-black/55 hover:text-black transition"
                 >
-                  В каталог →
+                  Смотреть все →
                 </Link>
               </div>
 

@@ -10,7 +10,12 @@ function makeOrderId() {
 }
 
 type CreatePayBody = {
-  customer?: Record<string, any>;
+  customer?: {
+    name?: string;
+    phone?: string;
+    telegram?: string | null;
+    [k: string]: any;
+  };
   items?: Array<{
     id?: string;
     title?: string;
@@ -34,6 +39,16 @@ function getRedisOrThrow() {
   return new Redis({ url, token });
 }
 
+function normalizePhone(s: string) {
+  return String(s ?? "").replace(/[^\d+]/g, "").trim();
+}
+
+function isValidPhone(raw: string) {
+  const p = normalizePhone(raw);
+  const digits = p.replace(/\D/g, "");
+  return digits.length >= 10 && digits.length <= 15;
+}
+
 export async function POST(req: Request) {
   try {
     const body = (await req.json()) as CreatePayBody;
@@ -54,30 +69,55 @@ export async function POST(req: Request) {
       );
     }
 
+    // ✅ customer validation
+    const customer = body.customer ?? {};
+    const name = String(customer.name ?? "").trim();
+    const phoneRaw = String(customer.phone ?? "").trim();
+    const phone = normalizePhone(phoneRaw);
+    const telegramRaw = customer.telegram == null ? "" : String(customer.telegram).trim();
+    const telegram = telegramRaw.replace(/^@/, ""); // храним без @ (удобнее)
+
+    if (!name) {
+      return NextResponse.json({ ok: false, error: "NAME_REQUIRED" }, { status: 400 });
+    }
+
+    if (!phone) {
+      return NextResponse.json({ ok: false, error: "PHONE_REQUIRED" }, { status: 400 });
+    }
+
+    if (!isValidPhone(phone)) {
+      return NextResponse.json({ ok: false, error: "PHONE_INVALID" }, { status: 400 });
+    }
+
     const orderId = makeOrderId();
 
     const order = {
       orderId,
       status: "pending_payment" as const,
       createdAt: Date.now(),
-      customer: body.customer ?? {},
+      customer: {
+        ...customer,
+        name,
+        phone, // ✅ нормализованный
+        telegram: telegram ? telegram : null, // ✅ опционально
+      },
       items,
       totalPrice,
     };
 
     const redis = getRedisOrThrow();
 
-    // ✅ лёгкая диагностика: если Redis недоступен — тут сразу вылетит с понятной ошибкой
     await redis.set(`order:${orderId}`, order, { ex: ORDER_TTL_SECONDS });
 
-    const siteUrl =
-        (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/+$/, "");
+    const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(
+      /\/+$/,
+      ""
+    );
     const paymentUrl = `${siteUrl}/order/${orderId}`;
 
     return NextResponse.json({ ok: true, orderId, paymentUrl });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : String(e);
-    // ВАЖНО: лог в Vercel
     console.error("PAY CREATE ERROR:", message, e);
 
     return NextResponse.json(
@@ -96,8 +136,5 @@ export async function POST(req: Request) {
 }
 
 export async function GET() {
-  return NextResponse.json(
-    { ok: false, error: "Method Not Allowed" },
-    { status: 405 }
-  );
+  return NextResponse.json({ ok: false, error: "Method Not Allowed" }, { status: 405 });
 }
