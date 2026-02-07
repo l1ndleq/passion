@@ -1,9 +1,13 @@
 import "./globals.css";
 import Link from "next/link";
-import { Providers } from "./providers";
+import AppProviders from "./providers";
 import { StickyHeader } from "@/components/StickyHeader";
 import SearchBarClientOnly from "@/components/SearchBarClientOnly";
 import MobileSearchClientOnly from "@/components/MobileSearchClientOnly";
+import CartButton from "@/components/CartButton";
+import CartLinkClientOnly from "@/components/CartLinkClientOnly";
+
+
 
 export const metadata = {
   title: "passion",
@@ -17,6 +21,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="ru">
       <body>
+        <AppProviders>
         <div className="min-h-screen bg-[#fbf7f3] text-[#141414]">
           <StickyHeader>
             <header className="border-b border-black/10 bg-white/60 backdrop-blur">
@@ -40,7 +45,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                                after:origin-left after:scale-x-0 after:bg-black/60
                                after:transition-transform after:duration-300 hover:after:scale-x-100"
                   >
-                    Продукты
+                    Каталог
                   </Link>
 
                   <Link
@@ -62,6 +67,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   >
                     Контакты
                   </Link>
+                   <CartLinkClientOnly />
                 </nav>
 
                 {/* СПЕЙСЕР */}
@@ -80,12 +86,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </header>
           </StickyHeader>
 
-          <Providers>{children}</Providers>
+          {children}
 
           <footer className="mx-auto max-w-6xl px-5 py-10 text-xs uppercase tracking-[0.22em] text-black/45">
             © {CURRENT_YEAR} passion
           </footer>
         </div>
+        </AppProviders>
       </body>
     </html>
   );

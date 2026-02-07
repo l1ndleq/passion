@@ -1,15 +1,8 @@
 import Link from "next/link";
 import { Suspense } from "react";
-import CartButtonClientOnly from "@/components/CartButtonClientOnly";
 import ProductsGridClient from "@/components/ProductsGridClient";
-
-
-const PRODUCTS = [
-  { id: "soft-cream", title: "Soft Cream", price: 1490 },
-  { id: "body-oil", title: "Body Oil", price: 1290 },
-  { id: "scrub", title: "Scrub", price: 990 },
-];
-
+import { PRODUCTS } from "@/app/lib/products";
+import CartLinkClientOnly from "@/components/CartLinkClientOnly";
 
 export default function ProductsPage() {
   return (
@@ -30,12 +23,11 @@ export default function ProductsPage() {
         </div>
 
         <div className="flex items-center gap-4">
-          <CartButtonClientOnly />
-
+          <CartLinkClientOnly />
         </div>
       </div>
 
-      {/* Grid (with search) */}
+      {/* Grid */}
       <div className="mt-10">
         <Suspense fallback={null}>
           <ProductsGridClient products={PRODUCTS} />

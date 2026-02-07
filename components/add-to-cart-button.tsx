@@ -1,44 +1,43 @@
 "use client";
 
-import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useCart } from "@/app/cart-context";
 
-export default function AddToCartButton({ product }: { product: any }) {
-  const { add } = useCart();
-  const [state, setState] = useState<"idle" | "added">("idle");
+type Product = { id: string; title: string; price: number };
 
-  const onAdd = () => {
-    if (state !== "idle") return;
+export default function AddToCartButton({
+  product,
+  className = "",
+}: {
+  product: Product;
+  className?: string;
+}) {
+  const { add } = useCart() as any;
+  const [added, setAdded] = useState(false);
 
-    add(product);
-    setState("added");
+  useEffect(() => {
+    if (!added) return;
+    const t = setTimeout(() => setAdded(false), 1000);
+    return () => clearTimeout(t);
+  }, [added]);
 
-    // через 1.2 сек вернём обратно в обычное состояние
-    window.setTimeout(() => setState("idle"), 1200);
-  };
-
-  // Общие классы (твой премиум-стиль + плавность)
-  const base =
-    "inline-flex items-center justify-center rounded-full px-6 py-3 text-sm font-semibold tracking-wide text-white " +
-    "transition-[background-color,transform,opacity] duration-300 ease-out active:scale-[0.98]";
-
-  // 1) Пока idle — обычная кнопка “В корзину”
-  if (state === "idle") {
-    return (
-      <button onClick={onAdd} className={[base, "bg-neutral-900 hover:bg-neutral-800"].join(" ")}>
-        В корзину
-      </button>
-    );
-  }
-
-  // 2) После добавления — ссылка “В корзину →”
   return (
-    <Link
-      href="/cart"
-      className={[base, "bg-emerald-600 hover:bg-emerald-700 opacity-95"].join(" ")}
+    <button
+      type="button"
+      onClick={() => {
+        add(product);
+        setAdded(true);
+      }}
+      className={[
+        "inline-flex items-center justify-center rounded-full px-6 py-2.5",
+        "text-sm font-semibold tracking-wide transition-[background-color,transform,opacity] duration-300",
+        added
+          ? "bg-emerald-600 text-white"
+          : "bg-neutral-900 text-white hover:bg-neutral-800 active:scale-[0.98]",
+        className,
+      ].join(" ")}
     >
-      В корзину →
-    </Link>
+      {added ? "Добавлено ✓" : "Добавить в корзину"}
+    </button>
   );
 }

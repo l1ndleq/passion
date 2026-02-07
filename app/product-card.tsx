@@ -2,7 +2,6 @@
 
 import AddToCartButton from "@/components/add-to-cart-button";
 
-
 export function ProductCard({
   product,
 }: {

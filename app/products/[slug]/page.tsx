@@ -2,10 +2,25 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import CartButtonClientOnly from "@/components/CartButtonClientOnly";
 import { PRODUCTS } from "@/app/lib/products";
+import CartLinkClientOnly from "@/components/CartLinkClientOnly";
+import AddToCartButton from "@/components/add-to-cart-button";
+import { ProductCard } from "@/components/ProductCard";
+import ProductsGridClient from "@/components/ProductsGridClient";
+import Image from "next/image";
 
-export default function ProductPage({ params }: { params: { slug: string } }) {
-  const product = PRODUCTS.find((p) => p.id === params.slug);
+
+
+export default async function ProductPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  const { slug } = await params;
+
+  const product = PRODUCTS.find((p) => p.id === slug);
   if (!product) return notFound();
+  const others = PRODUCTS.filter((p) => p.id !== slug).slice(0, 3);
+
 
   return (
     <main className="mx-auto max-w-6xl px-5 py-10">
@@ -25,13 +40,18 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
       <section className="mt-8 grid gap-10 md:grid-cols-12">
         {/* image */}
         <div className="md:col-span-7 overflow-hidden rounded-3xl border border-black/10 bg-white">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={product.image || "/images/placeholder-product.jpg"}
-            alt={product.title}
-            className="h-[420px] w-full object-cover md:h-[520px]"
-          />
-        </div>
+  <div className="relative aspect-[4/5] w-full">
+    <Image
+      src={product.image || "/images/placeholder-product.jpg"}
+      alt={product.title}
+      fill
+      priority
+      className="object-cover object-center"
+      sizes="(max-width: 1024px) 100vw, 58vw"
+    />
+  </div>
+</div>
+
 
         {/* info */}
         <div className="md:col-span-5">
@@ -53,17 +73,9 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
             <div className="text-lg font-semibold">
               {product.price.toLocaleString("ru-RU")} ₽
             </div>
-
-            <CartButtonClientOnly
-              product={{
-                id: product.id,
-                title: product.title,
-                price: product.price,
-              }}
-            />
           </div>
 
-          <div className="mt-6 flex flex-wrap gap-3">
+                    <div className="mt-6 flex flex-wrap gap-3">
             <Link
               href="/products"
               className="inline-flex items-center justify-center rounded-full
@@ -75,17 +87,29 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
               ← В каталог
             </Link>
 
-            <Link
-              href="/cart"
-              className="inline-flex items-center justify-center rounded-full
-                         bg-neutral-900 px-6 py-2.5
-                         text-sm font-semibold tracking-wide text-white
-                         transition-[background-color,transform] duration-300
-                         hover:bg-neutral-800 active:scale-[0.98]"
-            >
-              Корзина →
-            </Link>
+            <AddToCartButton
+              product={{ id: product.id, title: product.title, price: product.price }}
+            />
           </div>
+
+          {others.length > 0 ? (
+            <section className="mt-16">
+              <div className="mb-6 flex items-end justify-between gap-4">
+                <h2 className="text-lg md:text-xl font-semibold tracking-[-0.02em]">
+                  Другие товары
+                </h2>
+
+                <Link
+                  href="/products"
+                  className="text-xs tracking-[0.22em] uppercase text-black/55 hover:text-black transition"
+                >
+                  В каталог →
+                </Link>
+              </div>
+
+              <ProductsGridClient products={others} />
+            </section>
+          ) : null}
         </div>
       </section>
     </main>

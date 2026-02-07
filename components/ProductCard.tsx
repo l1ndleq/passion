@@ -43,50 +43,43 @@ export function ProductCard({
   const img = image?.trim() || "/images/placeholder-product.jpg";
 
   return (
-    <div className="group overflow-hidden rounded-2xl border border-black/10 bg-white shadow-sm transition-all duration-300 ease-out hover:-translate-y-0.5 hover:shadow-md">
-      <Link href={href} className="block">
-        {/* image */}
-        <div className="relative h-[220px] w-full bg-black/[0.03] sm:h-[240px]">
-          <Image
-            src={img}
-            alt={title}
-            fill
-            className="h-[220px] w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.03]"
-            sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
-          />
-          {badge ? (
-            <span className="absolute left-3 top-3 rounded-full bg-black/85 px-3 py-1 text-xs font-medium text-white">
-              {badge}
+  <div className="group overflow-hidden rounded-2xl border border-black/10 bg-white shadow-sm transition-all duration-300 ease-out hover:-translate-y-0.5 hover:shadow-md">
+    <Link href={href} className="block">
+      <div className="relative w-full overflow-hidden rounded-3xl bg-black/[0.03] aspect-[4/5]">
+  <Image
+    src={img}
+    alt={title}
+    fill
+    className="object-cover object-top"
+    sizes="(max-width: 1024px) 100vw, 50vw"
+    priority
+  />
+</div>
+
+
+      <div className="p-4">
+        <h3 className="line-clamp-2 text-sm font-medium leading-snug text-black">
+          {title}
+        </h3>
+
+        <div className="mt-3 flex items-center justify-between gap-3">
+          {typeof price === "number" ? (
+            <span className="text-sm font-semibold text-black">
+              {price.toLocaleString("ru-RU")} ₽
             </span>
+          ) : (
+            <span />
+          )}
+
+          {actions ? (
+            <div className="transition-all duration-300 ease-out md:opacity-0 md:translate-y-1 md:group-hover:opacity-100 md:group-hover:translate-y-0">
+              {actions}
+            </div>
           ) : null}
         </div>
-
-        {/* content */}
-        <div className="p-4">
-          <h3 className="line-clamp-2 text-sm font-medium leading-snug text-black">
-            {title}
-          </h3>
-
-          <div className="mt-3 flex items-center justify-between gap-3">
-            {/* price (optional) */}
-            {typeof price === "number" ? (
-              <span className="text-sm font-semibold text-black">
-                {price.toLocaleString("ru-RU")} ₽
-              </span>
-            ) : (
-              <span />
-            )}
-
-            {/* actions */}
-            {actions ? (
-  <div className="transition-all duration-300 ease-out md:opacity-0 md:translate-y-1 md:group-hover:opacity-100 md:group-hover:translate-y-0">
-    {actions}
+      </div>
+    </Link>
   </div>
-) : null}
+);
 
-          </div>
-        </div>
-      </Link>
-    </div>
-  );
 }
