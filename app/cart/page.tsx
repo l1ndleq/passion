@@ -62,7 +62,16 @@ export default function CartPage() {
             >
               <div className="flex gap-4">
                 {/* Image (если появится позже) */}
-                <div className="h-20 w-20 rounded-xl border bg-neutral-50 shrink-0" />
+                <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl border bg-neutral-50">
+  <Image
+    src={i.image || "/images/placeholder-product.jpg"}
+    alt={i.title}
+    fill
+    className="object-cover"
+    sizes="80px"
+  />
+</div>
+
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-3">
