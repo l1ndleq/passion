@@ -223,6 +223,10 @@ export async function POST(req: Request) {
 
     // сохраняем заказ
     await redis.set(`order:${orderId}`, order, { ex: ORDER_TTL_SECONDS });
+    // ✅ индекс для админки: последние заказы
+     await redis.lpush("orders:latest", orderId);
+     await redis.ltrim("orders:latest", 0, 199); // храним последние 200
+
 
     // ✅ Telegram: отправляем 1 раз на orderId (антидубль)
     const notifyKey = `order:${orderId}:tg_created`;
