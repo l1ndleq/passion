@@ -1,7 +1,6 @@
 {
   "name": "passion-telegram-bot",
   "private": true,
-  "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "start": "node --enable-source-maps dist/index.js",
