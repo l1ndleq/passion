@@ -2,6 +2,8 @@ import "dotenv/config";
 import express from "express";
 import { Telegraf, Markup } from "telegraf";
 import { Redis } from "@upstash/redis";
+import express, { Request, Response, NextFunction } from "express";
+
 
 const BOT_TOKEN = process.env.BOT_TOKEN!;
 const PUBLIC_SITE_URL = process.env.PUBLIC_SITE_URL!;
@@ -122,7 +124,7 @@ app.get("/", (_req, res) => res.status(200).send("OK"));
 
 // если используешь secret_token — проверяем заголовок от Telegram
 if (WEBHOOK_SECRET) {
-  app.use(WEBHOOK_PATH, (req, res, next) => {
+  app.use(WEBHOOK_PATH, (req: Request, res: Response, next: NextFunction) => {
     const secret = req.header("X-Telegram-Bot-Api-Secret-Token");
     if (secret !== WEBHOOK_SECRET) {
       return res.status(401).send("Unauthorized");
@@ -130,6 +132,7 @@ if (WEBHOOK_SECRET) {
     next();
   });
 }
+
 
 // основной webhook handler Telegraf
 app.use(WEBHOOK_PATH, bot.webhookCallback(WEBHOOK_PATH));
