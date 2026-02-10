@@ -80,10 +80,8 @@ export function clearSessionCookie() {
 
 export const SESSION_COOKIE_NAME = COOKIE_NAME;
 
-/**
- * Достаём сессию из Request (работает в Route Handlers).
- * Используй в любых app/api/*/route.ts (без последовательности звездочка-звездочка-слэш).
- */
+// Достаём сессию из Request (работает в Route Handlers).
+// Используй в API route files внутри app/api.
 export function getSessionFromRequest(req: Request): { phone: string } | null {
   const cookieHeader = req.headers.get("cookie") || "";
   const token = getCookieValue(cookieHeader, COOKIE_NAME);
