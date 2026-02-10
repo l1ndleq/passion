@@ -13,9 +13,9 @@ type AdminOrder = {
   total?: number;
   currency?: string;
   items?: Array<{
-    name?: string;
-    quantity?: number;
-    price?: number;
+    title: string;
+    qty: number;
+    price: number;
   }>;
   customer?: {
     name?: string;
