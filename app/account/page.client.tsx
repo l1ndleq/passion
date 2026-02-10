@@ -187,10 +187,7 @@ export default function AccountClient({ phone }: { phone: string }) {
           <div className="font-medium">Мои заказы</div>
 
           <button
-            onClick={() => {
-              // просто перезагрузим страницу — самый надёжный рефреш
-              window.location.reload();
-            }}
+            onClick={() => window.location.reload()}
             className="text-xs text-black/50 hover:text-black transition"
             type="button"
           >
@@ -210,49 +207,57 @@ export default function AccountClient({ phone }: { phone: string }) {
           </div>
         ) : (
           <div className="mt-3 divide-y divide-black/10 border border-black/10 rounded-xl overflow-hidden bg-white/30">
-            {sorted.map((o) => (
-              <div key={o.orderId} className="p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                <div>
-                  <div className="text-xs text-black/50">Заказ</div>
-                  <div className="font-medium">#{o.orderId}</div>
+            {sorted.map((o) => {
+              const items = Array.isArray(o.items) ? o.items : [];
+              const shownCount = Math.min(items.length, 3);
 
-                  <div className="mt-1 text-xs text-black/55">
-                    <span className="mr-2">{statusLabel(o.status)}</span>
-                    {typeof o.totalPrice === "number" && (
-                      <span className="mr-2">• {formatMoney(o.totalPrice)} ₽</span>
+              return (
+                <div
+                  key={o.orderId}
+                  className="p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3"
+                >
+                  <div>
+                    <div className="text-xs text-black/50">Заказ</div>
+                    <div className="font-medium">#{o.orderId}</div>
+
+                    <div className="mt-1 text-xs text-black/55">
+                      <span className="mr-2">{statusLabel(o.status)}</span>
+                      {typeof o.totalPrice === "number" && (
+                        <span className="mr-2">• {formatMoney(o.totalPrice)} ₽</span>
+                      )}
+                      {o.createdAt ? (
+                        <span>• {new Date(o.createdAt).toLocaleString()}</span>
+                      ) : null}
+                    </div>
+
+                    {items.length > 0 && (
+                      <div className="mt-2 text-xs text-black/55">
+                        {items.slice(0, shownCount).map((it, idx) => {
+                          const title = String(it.title ?? it.id ?? "Товар");
+                          const qty = Number(it.qty ?? 1);
+                          return (
+                            <span key={idx}>
+                              {title} × {qty}
+                              {idx < shownCount - 1 ? " • " : ""}
+                            </span>
+                          );
+                        })}
+                        {items.length > 3 ? <span> • …</span> : null}
+                      </div>
                     )}
-                    {o.createdAt ? (
-                      <span>• {new Date(o.createdAt).toLocaleString()}</span>
-                    ) : null}
                   </div>
 
-                  {Array.isArray(o.items) && o.items.length > 0 && (
-                    <div className="mt-2 text-xs text-black/55">
-                      {o.items.slice(0, 3).map((it, idx) => {
-                        const title = String(it.title ?? it.id ?? "Товар");
-                        const qty = Number(it.qty ?? 1);
-                        return (
-                          <span key={idx}>
-                            {title} × {qty}
-                            {idx < Math.min(o.items.length, 3) - 1 ? " • " : ""}
-                          </span>
-                        );
-                      })}
-                      {o.items.length > 3 ? <span> • …</span> : null}
-                    </div>
-                  )}
+                  <div className="flex items-center gap-2">
+                    <Link
+                      href={`/order/${o.orderId}`}
+                      className="rounded-xl border px-3 py-2 text-sm hover:bg-white/70"
+                    >
+                      Открыть
+                    </Link>
+                  </div>
                 </div>
-
-                <div className="flex items-center gap-2">
-                  <Link
-                    href={`/order/${o.orderId}`}
-                    className="rounded-xl border px-3 py-2 text-sm hover:bg-white/70"
-                  >
-                    Открыть
-                  </Link>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
