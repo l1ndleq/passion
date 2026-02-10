@@ -5,9 +5,9 @@ import { Redis } from "@upstash/redis";
 
 const BOT_TOKEN = process.env.BOT_TOKEN!;
 const PUBLIC_SITE_URL = process.env.PUBLIC_SITE_URL!;
-const WEBHOOK_DOMAIN = process.env.WEBHOOK_DOMAIN!; // например: https://passion-d4mc.onrender.com (без / на конце)
-const WEBHOOK_PATH = process.env.WEBHOOK_PATH || "/telegram/webhook";
-const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || ""; // можно оставить пустым
+const WEBHOOK_DOMAIN = process.env.WEBHOOK_DOMAIN!; // https://xxx.onrender.com (без / в конце)
+const WEBHOOK_PATH_RAW = process.env.WEBHOOK_PATH || "/telegram/webhook";
+const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || "";
 const PORT = Number(process.env.PORT || 3001);
 
 if (!BOT_TOKEN) throw new Error("BOT_TOKEN missing");
@@ -22,12 +22,28 @@ const redis = new Redis({
 });
 
 function normalizePhone(raw: string) {
-  // оставляем + и цифры, убираем пробелы/скобки/дефисы
-  return String(raw || "").trim().replace(/[^\d+]/g, "");
+  let s = String(raw || "").trim().replace(/[^\d+]/g, "");
+
+  // RU нормализация к +7, чтобы сайт/бот совпадали по ключам
+  if (s.startsWith("8") && s.length === 11) s = "+7" + s.slice(1);
+  if (s.startsWith("7") && s.length === 11) s = "+7" + s.slice(1);
+  if (s.startsWith("9") && s.length === 10) s = "+7" + s;
+
+  return s;
 }
 
-async function linkPhoneToChat(phone: string, chatId: number) {
+function phoneDigits(phone: string) {
+  return String(phone || "").replace(/[^\d]/g, "");
+}
+
+async function linkPhoneToChat(phoneRaw: string, chatId: number) {
+  const phone = normalizePhone(phoneRaw);
+  const digits = phoneDigits(phone);
+
+  // пишем сразу 2 ключа: с + и без + (чтобы никогда не промахнуться)
   await redis.set(`tg:phone:${phone}`, chatId);
+  await redis.set(`tg:phone:${digits}`, chatId);
+
   await redis.set(`tg:chat:${chatId}`, phone);
 }
 
@@ -58,7 +74,7 @@ bot.start(async (ctx) => {
     await redis.del(`bind:${token}`);
 
     await ctx.reply(
-      `✅ Готово! Номер ${phone} привязан.\nТеперь коды входа будут приходить сюда.`
+      `✅ Готово! Номер ${normalizePhone(phone)} привязан.\nТеперь коды входа будут приходить сюда.`
     );
     return;
   }
@@ -90,7 +106,7 @@ bot.on("contact", async (ctx) => {
   const phone = normalizePhone(contact.phone_number);
   const chatId = ctx.chat.id;
 
-  if (!phone || phone.length < 10) {
+  if (!phone || phoneDigits(phone).length < 10) {
     await ctx.reply("Не удалось прочитать номер. Попробуй ещё раз.");
     return;
   }
@@ -112,7 +128,7 @@ bot.on("contact", async (ctx) => {
 });
 
 // --------------------
-// Express + Webhook (исправлено: 404 больше не будет)
+// Express + Webhook
 // --------------------
 const app = express();
 app.use(express.json());
@@ -120,24 +136,24 @@ app.use(express.json());
 // healthcheck
 app.get("/", (_req: Request, res: Response) => res.status(200).send("OK"));
 
+// нормализуем путь (на случай если в ENV без слэша)
+const WEBHOOK_PATH = WEBHOOK_PATH_RAW.startsWith("/")
+  ? WEBHOOK_PATH_RAW
+  : `/${WEBHOOK_PATH_RAW}`;
+
 // webhook handler (Telegram шлёт POST)
 app.post(WEBHOOK_PATH, (req: Request, res: Response, next: NextFunction) => {
-  // Если включил secret_token — проверяем заголовок
   if (WEBHOOK_SECRET) {
     const secret = req.header("X-Telegram-Bot-Api-Secret-Token");
-    if (secret !== WEBHOOK_SECRET) {
-      return res.status(401).send("Unauthorized");
-    }
+    if (secret !== WEBHOOK_SECRET) return res.status(401).send("Unauthorized");
   }
   return bot.webhookCallback(WEBHOOK_PATH)(req, res, next);
 });
 
 async function start() {
-  // на всякий случай убираем слэш в конце домена
   const domain = WEBHOOK_DOMAIN.replace(/\/+$/, "");
   const webhookURL = `${domain}${WEBHOOK_PATH}`;
 
-  // регистрируем webhook в Telegram
   await bot.telegram.setWebhook(webhookURL, {
     secret_token: WEBHOOK_SECRET || undefined,
   });
