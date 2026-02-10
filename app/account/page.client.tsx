@@ -3,11 +3,19 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
-type SavedOrder = { orderId: string; savedAt: number };
 type Profile = { name: string; phone: string; email: string };
 
+type OrderItem = { id?: string; title?: string; price?: number; qty?: number; image?: string };
+type ServerOrder = {
+  orderId: string;
+  status?: string;
+  createdAt?: number;
+  totalPrice?: number;
+  items?: OrderItem[];
+  customer?: { name?: string; phone?: string; telegram?: string | null; [k: string]: any };
+};
+
 const PROFILE_KEY = "passion_profile";
-const ORDERS_KEY = "passion_orders";
 
 function safeJson<T>(raw: string | null, fallback: T): T {
   try {
@@ -17,36 +25,85 @@ function safeJson<T>(raw: string | null, fallback: T): T {
   }
 }
 
-export default function AccountClient() {
+function formatMoney(n: number) {
+  try {
+    return n.toLocaleString("ru-RU");
+  } catch {
+    return String(n);
+  }
+}
+
+function statusLabel(status?: string) {
+  if (!status) return "—";
+  if (status === "paid") return "Оплачено ✅";
+  if (status === "pending_payment") return "Не оплачено ⏳";
+  return status;
+}
+
+export default function AccountClient({ phone }: { phone: string }) {
   const [profile, setProfile] = useState<Profile>({ name: "", phone: "", email: "" });
-  const [orders, setOrders] = useState<SavedOrder[]>([]);
+
+  const [orders, setOrders] = useState<ServerOrder[]>([]);
+  const [loadingOrders, setLoadingOrders] = useState(true);
+  const [ordersError, setOrdersError] = useState<string | null>(null);
+
   const [trackValue, setTrackValue] = useState("");
 
   useEffect(() => {
-    setProfile(safeJson<Profile>(localStorage.getItem(PROFILE_KEY), { name: "", phone: "", email: "" }));
-    setOrders(safeJson<SavedOrder[]>(localStorage.getItem(ORDERS_KEY), []));
+    setProfile(
+      safeJson<Profile>(localStorage.getItem(PROFILE_KEY), {
+        name: "",
+        phone: phone || "",
+        email: "",
+      })
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    let alive = true;
+
+    async function load() {
+      try {
+        setLoadingOrders(true);
+        setOrdersError(null);
+
+        const r = await fetch("/api/account/orders", { cache: "no-store" });
+        const j = await r.json().catch(() => null);
+
+        if (!alive) return;
+
+        if (!r.ok || !j?.ok) {
+          setOrdersError(j?.error || "ORDERS_FAILED");
+          setOrders([]);
+          return;
+        }
+
+        setOrders(Array.isArray(j.orders) ? j.orders : []);
+      } catch {
+        if (!alive) return;
+        setOrdersError("ORDERS_FAILED");
+        setOrders([]);
+      } finally {
+        if (!alive) return;
+        setLoadingOrders(false);
+      }
+    }
+
+    load();
+    return () => {
+      alive = false;
+    };
   }, []);
 
   const sorted = useMemo(
-    () => [...orders].sort((a, b) => (b.savedAt ?? 0) - (a.savedAt ?? 0)).slice(0, 10),
+    () => [...orders].sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0)).slice(0, 50),
     [orders]
   );
 
   function saveProfile(next: Profile) {
     setProfile(next);
     localStorage.setItem(PROFILE_KEY, JSON.stringify(next));
-  }
-
-  function clearOrders() {
-    localStorage.removeItem(ORDERS_KEY);
-    setOrders([]);
-  }
-
-  function copyLink(orderId: string) {
-    const url = `${window.location.origin}/order/${orderId}`;
-    navigator.clipboard.writeText(url).catch(() => {
-      prompt("Скопируй ссылку:", url);
-    });
   }
 
   function normalizeOrderId(v: string) {
@@ -61,6 +118,7 @@ export default function AccountClient() {
       <div>
         <div className="text-sm text-black/60">Личный кабинет</div>
         <div className="text-2xl font-semibold">Мой аккаунт</div>
+        <div className="mt-1 text-xs text-black/50">Вы вошли как: {phone}</div>
       </div>
 
       {/* Профиль */}
@@ -90,7 +148,7 @@ export default function AccountClient() {
           </div>
 
           <div className="mt-3 text-xs text-black/50">
-            Данные сохраняются в этом браузере (localStorage).
+            Профиль сохраняется в этом браузере (localStorage). Заказы — на сервере.
           </div>
         </div>
 
@@ -127,44 +185,67 @@ export default function AccountClient() {
       <div className="border border-black/10 rounded-2xl bg-white/40 p-4">
         <div className="flex items-center justify-between gap-3">
           <div className="font-medium">Мои заказы</div>
-          {sorted.length > 0 && (
-            <button
-              onClick={clearOrders}
-              className="text-xs text-black/50 hover:text-black transition"
-              type="button"
-            >
-              Очистить историю
-            </button>
-          )}
+
+          <button
+            onClick={() => {
+              // просто перезагрузим страницу — самый надёжный рефреш
+              window.location.reload();
+            }}
+            className="text-xs text-black/50 hover:text-black transition"
+            type="button"
+          >
+            Обновить
+          </button>
         </div>
 
-        {sorted.length === 0 ? (
+        {loadingOrders ? (
+          <div className="mt-3 text-sm text-black/50">Загрузка заказов…</div>
+        ) : ordersError ? (
+          <div className="mt-3 text-sm text-red-600">
+            Не удалось загрузить заказы: {ordersError}
+          </div>
+        ) : sorted.length === 0 ? (
           <div className="mt-3 text-sm text-black/50">
-            Пока пусто. После открытия страницы заказа он появится здесь.
+            Пока пусто. Оформи заказ — и он появится здесь.
           </div>
         ) : (
           <div className="mt-3 divide-y divide-black/10 border border-black/10 rounded-xl overflow-hidden bg-white/30">
-            {sorted.map((x) => (
-              <div key={x.orderId} className="p-4 flex items-center justify-between gap-3">
+            {sorted.map((o) => (
+              <div key={o.orderId} className="p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                 <div>
                   <div className="text-xs text-black/50">Заказ</div>
-                  <div className="font-medium">#{x.orderId}</div>
-                  <div className="text-xs text-black/50">
-                    Сохранён: {new Date(x.savedAt).toLocaleString()}
+                  <div className="font-medium">#{o.orderId}</div>
+
+                  <div className="mt-1 text-xs text-black/55">
+                    <span className="mr-2">{statusLabel(o.status)}</span>
+                    {typeof o.totalPrice === "number" && (
+                      <span className="mr-2">• {formatMoney(o.totalPrice)} ₽</span>
+                    )}
+                    {o.createdAt ? (
+                      <span>• {new Date(o.createdAt).toLocaleString()}</span>
+                    ) : null}
                   </div>
+
+                  {Array.isArray(o.items) && o.items.length > 0 && (
+                    <div className="mt-2 text-xs text-black/55">
+                      {o.items.slice(0, 3).map((it, idx) => {
+                        const title = String(it.title ?? it.id ?? "Товар");
+                        const qty = Number(it.qty ?? 1);
+                        return (
+                          <span key={idx}>
+                            {title} × {qty}
+                            {idx < Math.min(o.items.length, 3) - 1 ? " • " : ""}
+                          </span>
+                        );
+                      })}
+                      {o.items.length > 3 ? <span> • …</span> : null}
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => copyLink(x.orderId)}
-                    className="rounded-xl border px-3 py-2 text-sm hover:bg-white/70"
-                    type="button"
-                  >
-                    Скопировать ссылку
-                  </button>
-
                   <Link
-                    href={`/order/${x.orderId}`}
+                    href={`/order/${o.orderId}`}
                     className="rounded-xl border px-3 py-2 text-sm hover:bg-white/70"
                   >
                     Открыть
@@ -177,7 +258,7 @@ export default function AccountClient() {
       </div>
 
       <div className="text-xs text-black/45">
-        Дальше можно добавить “вход по телефону (OTP)” и хранить профиль/заказы уже на сервере.
+        Если заказа нет в списке — проверь, что оформление делалось под этим номером телефона.
       </div>
     </div>
   );
