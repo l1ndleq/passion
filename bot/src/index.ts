@@ -1,19 +1,20 @@
 import "dotenv/config";
+import express, { Request, Response, NextFunction } from "express";
 import { Telegraf, Markup } from "telegraf";
 import { Redis } from "@upstash/redis";
-import express, { Request, Response, NextFunction } from "express";
-
 
 const BOT_TOKEN = process.env.BOT_TOKEN!;
 const PUBLIC_SITE_URL = process.env.PUBLIC_SITE_URL!;
-const WEBHOOK_DOMAIN = process.env.WEBHOOK_DOMAIN!;
+const WEBHOOK_DOMAIN = process.env.WEBHOOK_DOMAIN!; // например: https://passion-d4mc.onrender.com (без / на конце)
 const WEBHOOK_PATH = process.env.WEBHOOK_PATH || "/telegram/webhook";
-const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || "";
+const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || ""; // можно оставить пустым
 const PORT = Number(process.env.PORT || 3001);
 
 if (!BOT_TOKEN) throw new Error("BOT_TOKEN missing");
 if (!PUBLIC_SITE_URL) throw new Error("PUBLIC_SITE_URL missing");
 if (!WEBHOOK_DOMAIN) throw new Error("WEBHOOK_DOMAIN missing");
+if (!process.env.UPSTASH_REDIS_REST_URL) throw new Error("UPSTASH_REDIS_REST_URL missing");
+if (!process.env.UPSTASH_REDIS_REST_TOKEN) throw new Error("UPSTASH_REDIS_REST_TOKEN missing");
 
 const redis = new Redis({
   url: process.env.UPSTASH_REDIS_REST_URL!,
@@ -22,9 +23,7 @@ const redis = new Redis({
 
 function normalizePhone(raw: string) {
   // оставляем + и цифры, убираем пробелы/скобки/дефисы
-  const s = String(raw || "").trim().replace(/[^\d+]/g, "");
-  // если прилетит без +, оставим как есть (можно усилить под RU позже)
-  return s;
+  return String(raw || "").trim().replace(/[^\d+]/g, "");
 }
 
 async function linkPhoneToChat(phone: string, chatId: number) {
@@ -55,7 +54,7 @@ bot.start(async (ctx) => {
     const chatId = ctx.chat.id;
     await linkPhoneToChat(phone, chatId);
 
-    // можно удалить токен, чтобы был одноразовый
+    // одноразовый токен
     await redis.del(`bind:${token}`);
 
     await ctx.reply(
@@ -113,33 +112,32 @@ bot.on("contact", async (ctx) => {
 });
 
 // --------------------
-// Express + Webhook
+// Express + Webhook (исправлено: 404 больше не будет)
 // --------------------
 const app = express();
 app.use(express.json());
 
 // healthcheck
-app.get("/", (_req, res) => res.status(200).send("OK"));
+app.get("/", (_req: Request, res: Response) => res.status(200).send("OK"));
 
-// если используешь secret_token — проверяем заголовок от Telegram
-if (WEBHOOK_SECRET) {
-  app.use(WEBHOOK_PATH, (req: Request, res: Response, next: NextFunction) => {
+// webhook handler (Telegram шлёт POST)
+app.post(WEBHOOK_PATH, (req: Request, res: Response, next: NextFunction) => {
+  // Если включил secret_token — проверяем заголовок
+  if (WEBHOOK_SECRET) {
     const secret = req.header("X-Telegram-Bot-Api-Secret-Token");
     if (secret !== WEBHOOK_SECRET) {
       return res.status(401).send("Unauthorized");
     }
-    next();
-  });
-}
-
-
-// основной webhook handler Telegraf
-app.use(WEBHOOK_PATH, bot.webhookCallback(WEBHOOK_PATH));
+  }
+  return bot.webhookCallback(WEBHOOK_PATH)(req, res, next);
+});
 
 async function start() {
-  const webhookURL = `${WEBHOOK_DOMAIN}${WEBHOOK_PATH}`;
+  // на всякий случай убираем слэш в конце домена
+  const domain = WEBHOOK_DOMAIN.replace(/\/+$/, "");
+  const webhookURL = `${domain}${WEBHOOK_PATH}`;
 
-  // зарегистрировать webhook в Telegram
+  // регистрируем webhook в Telegram
   await bot.telegram.setWebhook(webhookURL, {
     secret_token: WEBHOOK_SECRET || undefined,
   });
