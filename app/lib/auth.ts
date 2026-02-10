@@ -54,7 +54,6 @@ export function verifySessionToken(
   }
 }
 
-/** Для NextResponse.cookies.set */
 export function sessionCookie(token: string) {
   return {
     name: COOKIE_NAME,
@@ -67,7 +66,6 @@ export function sessionCookie(token: string) {
   };
 }
 
-/** Для logout */
 export function clearSessionCookie() {
   return {
     name: COOKIE_NAME,
@@ -84,7 +82,7 @@ export const SESSION_COOKIE_NAME = COOKIE_NAME;
 
 /**
  * Достаём сессию из Request (работает в Route Handlers).
- * Используй в app/api/**/route.ts
+ * Используй в любых app/api/*/route.ts (без последовательности звездочка-звездочка-слэш).
  */
 export function getSessionFromRequest(req: Request): { phone: string } | null {
   const cookieHeader = req.headers.get("cookie") || "";
