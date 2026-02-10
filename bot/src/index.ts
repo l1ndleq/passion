@@ -1,5 +1,4 @@
 import "dotenv/config";
-import express from "express";
 import { Telegraf, Markup } from "telegraf";
 import { Redis } from "@upstash/redis";
 import express, { Request, Response, NextFunction } from "express";
