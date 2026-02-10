@@ -52,39 +52,6 @@ export default function OrderAdminClient() {
   const STATUS_URL = orderId ? `/api/admin/orders/${orderId}/status` : null;
 
   async function load() {
-    if (!GET_URL || !orderId) return;
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const res = await fetch(GET_URL, { cache: "no-store" });
-      const data = await res.json();
-
-      if (!res.ok) {
-        setError(data?.message || "Не удалось загрузить заказ");
-        setOrder(null);
-        return;
-      }
-
-      if (!data?.ok || !data?.order) {
-  setError("Заказ не найден");
-  setOrder(null);
-  return;
-}
-
-setOrder(data.order);
-
-    } catch {
-      setError("Ошибка сети");
-      setOrder(null);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-
-  async function load() {
   if (!GET_URL || !orderId) return;
 
   setLoading(true);

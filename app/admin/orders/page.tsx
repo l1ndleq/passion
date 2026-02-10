@@ -166,8 +166,6 @@ export default function AdminOrdersPage() {
     Пока нет заказов.
   </div>
 )}
-
-
       </div>
     </main>
   );
