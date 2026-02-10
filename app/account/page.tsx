@@ -25,7 +25,7 @@ export default async function AccountPage() {
 
   return (
     <Suspense fallback={<div className="p-6 text-sm text-black/60">Загрузка…</div>}>
-      <AccountClient />
+      <AccountClient phone={session.phone} />
     </Suspense>
   );
 }
