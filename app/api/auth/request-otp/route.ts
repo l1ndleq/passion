@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requestOtp } from "@/app/lib/otp";
 import { redis } from "@/app/lib/redis";
 
-const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN!;
+const BOT_TOKEN = process.env.TELEGRAM_LOGIN_BOT_TOKEN!;
 
 function normalizePhone(raw: string) {
   let s = String(raw || "").trim().replace(/[^\d+]/g, "");
