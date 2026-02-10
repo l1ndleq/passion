@@ -32,7 +32,9 @@ export function createSessionToken(payload: { phone: string }) {
   return `${body}.${sig}`;
 }
 
-export function verifySessionToken(token: string | undefined | null): { phone: string } | null {
+export function verifySessionToken(
+  token: string | undefined | null
+): { phone: string } | null {
   if (!token) return null;
   const [body, sig] = token.split(".");
   if (!body || !sig) return null;
@@ -41,7 +43,9 @@ export function verifySessionToken(token: string | undefined | null): { phone: s
   if (!crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return null;
 
   try {
-    const json = JSON.parse(Buffer.from(body.replaceAll("-", "+").replaceAll("_", "/"), "base64").toString("utf8"));
+    const json = JSON.parse(
+      Buffer.from(body.replaceAll("-", "+").replaceAll("_", "/"), "base64").toString("utf8")
+    );
     if (!json?.phone || !json?.exp) return null;
     if (Date.now() > Number(json.exp)) return null;
     return { phone: String(json.phone) };
@@ -50,8 +54,8 @@ export function verifySessionToken(token: string | undefined | null): { phone: s
   }
 }
 
+/** Для NextResponse.cookies.set */
 export function sessionCookie(token: string) {
-  // для NextResponse.cookies.set
   return {
     name: COOKIE_NAME,
     value: token,
@@ -63,4 +67,38 @@ export function sessionCookie(token: string) {
   };
 }
 
+/** Для logout */
+export function clearSessionCookie() {
+  return {
+    name: COOKIE_NAME,
+    value: "",
+    httpOnly: true,
+    sameSite: "lax" as const,
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 0,
+  };
+}
+
 export const SESSION_COOKIE_NAME = COOKIE_NAME;
+
+/**
+ * Достаём сессию из Request (работает в Route Handlers).
+ * Используй в app/api/**/route.ts
+ */
+export function getSessionFromRequest(req: Request): { phone: string } | null {
+  const cookieHeader = req.headers.get("cookie") || "";
+  const token = getCookieValue(cookieHeader, COOKIE_NAME);
+  return verifySessionToken(token);
+}
+
+function getCookieValue(cookieHeader: string, name: string): string | null {
+  if (!cookieHeader) return null;
+  const parts = cookieHeader.split(";").map((p) => p.trim());
+  for (const p of parts) {
+    if (p.startsWith(name + "=")) {
+      return decodeURIComponent(p.slice(name.length + 1));
+    }
+  }
+  return null;
+}

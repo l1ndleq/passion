@@ -42,13 +42,25 @@ function getRedisOrThrow() {
   return new Redis({ url, token });
 }
 
-function normalizePhone(s: string) {
-  return String(s ?? "").replace(/[^\d+]/g, "").trim();
+/** Каноничная нормализация телефона (как в OTP/боте) */
+function normalizePhone(raw: string) {
+  let s = String(raw ?? "").trim().replace(/[^\d+]/g, "");
+
+  // RU -> +7
+  if (s.startsWith("8") && s.length === 11) s = "+7" + s.slice(1);
+  if (s.startsWith("7") && s.length === 11) s = "+7" + s.slice(1);
+  if (s.startsWith("9") && s.length === 10) s = "+7" + s;
+
+  return s;
+}
+
+function phoneDigits(phone: string) {
+  return String(phone ?? "").replace(/[^\d]/g, "");
 }
 
 function isValidPhone(raw: string) {
   const p = normalizePhone(raw);
-  const digits = p.replace(/\D/g, "");
+  const digits = phoneDigits(p);
   return digits.length >= 10 && digits.length <= 15;
 }
 
@@ -204,15 +216,16 @@ export async function POST(req: Request) {
     }
 
     const orderId = makeOrderId();
+    const createdAt = Date.now();
 
     const order = {
       orderId,
       status: "pending_payment" as const, // ⏳ сейчас заявка/не оплачено
-      createdAt: Date.now(),
+      createdAt,
       customer: {
         ...customer,
         name,
-        phone,
+        phone, // ✅ каноничный формат (+7...)
         telegram: telegram ? telegram : null,
       },
       items,
@@ -221,14 +234,19 @@ export async function POST(req: Request) {
 
     const redis = getRedisOrThrow();
 
-    // сохраняем заказ
+    // 1) сохраняем заказ
     await redis.set(`order:${orderId}`, order, { ex: ORDER_TTL_SECONDS });
-    // ✅ индекс для админки: последние заказы
-     await redis.lpush("orders:latest", orderId);
-     await redis.ltrim("orders:latest", 0, 199); // храним последние 200
 
+    // 2) ✅ индекс для админки: последние заказы
+    await redis.lpush("orders:latest", orderId);
+    await redis.ltrim("orders:latest", 0, 199); // последние 200
 
-    // ✅ Telegram: отправляем 1 раз на orderId (антидубль)
+    // 3) ✅ индекс для ЛК: заказы пользователя по телефону (ZSET)
+    // user:orders:<digits> => member=orderId, score=createdAt
+    const userOrdersKey = `user:orders:${phoneDigits(phone)}`;
+    await redis.zadd(userOrdersKey, { score: createdAt, member: orderId });
+
+    // 4) ✅ Telegram: отправляем 1 раз на orderId (антидубль)
     const notifyKey = `order:${orderId}:tg_created`;
     const alreadyNotified = await redis.get(notifyKey);
     if (!alreadyNotified) {
