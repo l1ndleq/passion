@@ -1,4 +1,5 @@
 import "dotenv/config";
+import express from "express";
 import { Telegraf, Markup } from "telegraf";
 import { Redis } from "@upstash/redis";
 
@@ -44,7 +45,9 @@ bot.start(async (ctx) => {
 
     const phone = await redis.get<string>(`bind:${token}`);
     if (!phone) {
-      await ctx.reply("Ссылка привязки устарела. Открой /account → Привязать Telegram ещё раз.");
+      await ctx.reply(
+        "Ссылка привязки устарела. Открой /account → Привязать Telegram ещё раз."
+      );
       return;
     }
 
@@ -54,7 +57,9 @@ bot.start(async (ctx) => {
     // можно удалить токен, чтобы был одноразовый
     await redis.del(`bind:${token}`);
 
-    await ctx.reply(`✅ Готово! Номер ${phone} привязан.\nТеперь коды входа будут приходить сюда.`);
+    await ctx.reply(
+      `✅ Готово! Номер ${phone} привязан.\nТеперь коды входа будут приходить сюда.`
+    );
     return;
   }
 
@@ -106,19 +111,40 @@ bot.on("contact", async (ctx) => {
   );
 });
 
-// Webhook запуск
+// --------------------
+// Express + Webhook
+// --------------------
+const app = express();
+app.use(express.json());
+
+// healthcheck
+app.get("/", (_req, res) => res.status(200).send("OK"));
+
+// если используешь secret_token — проверяем заголовок от Telegram
+if (WEBHOOK_SECRET) {
+  app.use(WEBHOOK_PATH, (req, res, next) => {
+    const secret = req.header("X-Telegram-Bot-Api-Secret-Token");
+    if (secret !== WEBHOOK_SECRET) {
+      return res.status(401).send("Unauthorized");
+    }
+    next();
+  });
+}
+
+// основной webhook handler Telegraf
+app.use(WEBHOOK_PATH, bot.webhookCallback(WEBHOOK_PATH));
+
 async function start() {
   const webhookURL = `${WEBHOOK_DOMAIN}${WEBHOOK_PATH}`;
 
-  // Telegraf сам выставит webhook у Telegram
+  // зарегистрировать webhook в Telegram
   await bot.telegram.setWebhook(webhookURL, {
     secret_token: WEBHOOK_SECRET || undefined,
   });
 
-  // Поднимаем сервер под webhook
-  bot.startWebhook(WEBHOOK_PATH, WEBHOOK_SECRET || undefined, PORT);
-
-  console.log("Bot webhook listening:", webhookURL);
+  app.listen(PORT, () => {
+    console.log("Bot webhook listening:", webhookURL);
+  });
 }
 
 start().catch((e) => {
