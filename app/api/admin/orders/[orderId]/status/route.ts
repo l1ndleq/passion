@@ -48,6 +48,8 @@ await notifyTelegramStatusChange({
   status,
   totalPrice: updated.totalPrice,
   customerName: updated.customer?.name,
+}).catch((e) => {
+  console.error("TG notify failed", e);
 });
 async function notifyTelegramStatusChange({
   orderId,
