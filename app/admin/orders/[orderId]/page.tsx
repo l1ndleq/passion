@@ -3,6 +3,8 @@ export const dynamic = "force-dynamic";
 
 import { Suspense } from "react";
 import OrderAdminClient from "./page.client";
+import OrderClient from "./OrderClient";
+
 
 export default function AdminOrderPage() {
   return (

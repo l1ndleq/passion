@@ -7,6 +7,9 @@ import MobileSearchClientOnly from "@/components/MobileSearchClientOnly";
 import CartButton from "@/components/CartButton";
 import CartLinkClientOnly from "@/components/CartLinkClientOnly";
 import { Inter, Cormorant_Garamond } from "next/font/google";
+import OrderTrackHeader from "@/components/OrderTrackHeader";
+
+
 
 const inter = Inter({
   subsets: ["latin", "cyrillic"],
@@ -21,15 +24,22 @@ const cormorant = Cormorant_Garamond({
   display: "swap",
 });
 
-
-
 export const metadata = {
   title: "passion",
   description: "Passion cosmetics — minimal beauty",
 };
 
+const NAV_LINK =
+  "text-[11px] uppercase tracking-[0.22em] text-black/60 " +
+  "relative transition-colors hover:text-black " +
+  "after:absolute after:left-0 after:-bottom-1 after:h-[1px] after:w-full " +
+  "after:origin-left after:scale-x-0 after:bg-black/60 " +
+  "after:transition-transform after:duration-300 hover:after:scale-x-100";
+
+
 // layout — Server Component
 const CURRENT_YEAR = new Date().getFullYear();
+
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -62,15 +72,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                     Каталог
                   </Link>
 
-                  <Link
-                    href="/about"
-                    className="relative transition-colors hover:text-black
-                               after:absolute after:left-0 after:-bottom-1 after:h-[1px] after:w-full
-                               after:origin-left after:scale-x-0 after:bg-black/60
-                               after:transition-transform after:duration-300 hover:after:scale-x-100"
-                  >
-                    О бренде
-                  </Link>
+             
 
                   <Link
                     href="/contact"
@@ -81,7 +83,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   >
                     Контакты
                   </Link>
-                   <CartLinkClientOnly />
+                   <CartLinkClientOnly className={NAV_LINK}/>
+                   <Link href="/account" className={NAV_LINK}>Кабинет</Link>
+
+
                 </nav>
 
                 {/* СПЕЙСЕР */}

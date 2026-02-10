@@ -189,13 +189,24 @@ export default function OrderAdminClient() {
           </div>
         </div>
 
-        <button
-          onClick={load}
-          disabled={loading}
-          className="border rounded-xl px-4 py-2 text-sm hover:bg-neutral-50 disabled:opacity-50"
-        >
-          Обновить
-        </button>
+<div className="flex items-center gap-2">
+  <button
+    onClick={() => navigator.clipboard.writeText(window.location.href)}
+    className="border rounded-xl px-4 py-2 text-sm hover:bg-neutral-50"
+  >
+    Скопировать ссылку
+  </button>
+
+  <button
+    onClick={load}
+    disabled={loading}
+    className="border rounded-xl px-4 py-2 text-sm hover:bg-neutral-50 disabled:opacity-50"
+  >
+    Обновить
+  </button>
+</div>
+
+
       </div>
 
       {error && (
