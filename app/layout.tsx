@@ -4,11 +4,9 @@ import AppProviders from "./providers";
 import { StickyHeader } from "@/components/StickyHeader";
 import SearchBarClientOnly from "@/components/SearchBarClientOnly";
 import MobileSearchClientOnly from "@/components/MobileSearchClientOnly";
-import CartButton from "@/components/CartButton";
+import MobileMenu from "@/components/MobileMenu";
 import CartLinkClientOnly from "@/components/CartLinkClientOnly";
 import { Inter, Cormorant_Garamond } from "next/font/google";
-import OrderTrackHeader from "@/components/OrderTrackHeader";
-import { CartProvider } from "@/components/cart/CartProvider";
 
 const inter = Inter({
   subsets: ["latin", "cyrillic"],
@@ -46,36 +44,23 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <div className="min-h-screen bg-[#fbf7f3] text-[#141414]">
             <StickyHeader>
               <header className="border-b border-black/10 bg-white/60 backdrop-blur">
-                <div className="mx-auto flex h-12 max-w-6xl items-center px-5">
-                  {/* ЛЕВО — навигация */}
-                  <nav className="flex shrink-0 items-center gap-8 text-[11px] uppercase tracking-[0.22em] text-black/60">
-                    <Link
-                      href="/"
-                      className="relative transition-colors hover:text-black
-                               after:absolute after:left-0 after:-bottom-1 after:h-[1px] after:w-full
-                               after:origin-left after:scale-x-0 after:bg-black/60
-                               after:transition-transform after:duration-300 hover:after:scale-x-100"
-                    >
+                <div className="mx-auto flex h-12 max-w-6xl items-center px-5 relative">
+                  {/* MOBILE: left burger */}
+                  <div className="md:hidden">
+                    <MobileMenu />
+                  </div>
+
+                  {/* DESKTOP NAV */}
+                  <nav className="hidden md:flex shrink-0 items-center gap-8 text-[11px] uppercase tracking-[0.22em] text-black/60">
+                    <Link href="/" className={NAV_LINK}>
                       Главная
                     </Link>
 
-                    <Link
-                      href="/products"
-                      className="relative transition-colors hover:text-black
-                               after:absolute after:left-0 after:-bottom-1 after:h-[1px] after:w-full
-                               after:origin-left after:scale-x-0 after:bg-black/60
-                               after:transition-transform after:duration-300 hover:after:scale-x-100"
-                    >
+                    <Link href="/products" className={NAV_LINK}>
                       Каталог
                     </Link>
 
-                    <Link
-                      href="/contact"
-                      className="relative transition-colors hover:text-black
-                               after:absolute after:left-0 after:-bottom-1 after:h-[1px] after:w-full
-                               after:origin-left after:scale-x-0 after:bg-black/60
-                               after:transition-transform after:duration-300 hover:after:scale-x-100"
-                    >
+                    <Link href="/contact" className={NAV_LINK}>
                       Контакты
                     </Link>
 
@@ -85,16 +70,27 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                     </Link>
                   </nav>
 
-                  {/* СПЕЙСЕР */}
+                  {/* CENTER LOGO (mobile + desktop) */}
+                  <div className="absolute left-1/2 -translate-x-1/2">
+                    <Link
+                      href="/"
+                      className="text-[13px] uppercase tracking-[0.32em] text-black/80 hover:text-black transition-colors"
+                    >
+                      passion
+                    </Link>
+                  </div>
+
+                  {/* SPACER */}
                   <div className="flex-1" />
 
-                  {/* ПРАВО — поиск (вторая половина) */}
+                  {/* DESKTOP SEARCH */}
                   <div className="hidden md:flex w-[560px] max-w-[50%]">
                     <SearchBarClientOnly className="w-full" />
                   </div>
 
-                  {/* mobile search icon */}
-                  <div className="md:hidden">
+                  {/* MOBILE RIGHT: cart + search */}
+                  <div className="md:hidden ml-auto flex items-center gap-1">
+                    <CartLinkClientOnly className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-[11px] uppercase tracking-[0.22em] text-black/70 hover:text-black" />
                     <MobileSearchClientOnly />
                   </div>
                 </div>
