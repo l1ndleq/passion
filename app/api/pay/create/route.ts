@@ -62,7 +62,22 @@ function isValidPhone(raw: string) {
   return digits.length >= 10 && digits.length <= 15;
 }
 
-/** ===== Telegram helpers (АДМИН-уведомления через PassionOfferBot) ===== */
+function escapeHtml(s: string) {
+  return String(s ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
+function formatMoney(n: number) {
+  try {
+    return n.toLocaleString("ru-RU");
+  } catch {
+    return String(n);
+  }
+}
+
+/** ===== Telegram: Admin ===== */
 function getAdminChatIds() {
   const raw = process.env.TELEGRAM_CHAT_IDS || "";
   return raw
@@ -78,7 +93,7 @@ async function sendAdminTelegram({
   text: string;
   orderUrl: string;
 }) {
-  const token = process.env.TELEGRAM_ADMIN_BOT_TOKEN; // ✅ ВАЖНО: админский бот
+  const token = process.env.TELEGRAM_ADMIN_BOT_TOKEN;
   const chatIds = getAdminChatIds();
 
   if (!token || chatIds.length === 0) return;
@@ -109,22 +124,42 @@ async function sendAdminTelegram({
   );
 }
 
-function escapeHtml(s: string) {
-  return String(s ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;");
-}
+/** ===== Telegram: User (PassionLoginBot) ===== */
+async function sendUserTelegram({
+  chatId,
+  text,
+  orderUrl,
+}: {
+  chatId: number;
+  text: string;
+  orderUrl: string;
+}) {
+  const token = process.env.TELEGRAM_LOGIN_BOT_TOKEN; // ✅ логин-бот
+  if (!token || !chatId) return;
 
-function formatMoney(n: number) {
-  try {
-    return n.toLocaleString("ru-RU");
-  } catch {
-    return String(n);
+  const keyboard = orderUrl
+    ? { inline_keyboard: [[{ text: "Открыть заказ", url: orderUrl }]] }
+    : undefined;
+
+  const r = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      chat_id: chatId,
+      text,
+      parse_mode: "HTML",
+      disable_web_page_preview: true,
+      ...(keyboard ? { reply_markup: keyboard } : {}),
+    }),
+  });
+
+  const j = await r.json().catch(() => null);
+  if (!r.ok || !j?.ok) {
+    console.error("User Telegram send failed:", { chatId, status: r.status, resp: j });
   }
 }
 
-function formatOrderText(order: {
+function formatAdminOrderText(order: {
   orderId: string;
   status: string;
   createdAt: number;
@@ -169,6 +204,19 @@ function formatOrderText(order: {
   return lines.join("\n");
 }
 
+function formatUserOrderText(order: {
+  orderId: string;
+  totalPrice: number;
+}) {
+  const lines: string[] = [];
+  lines.push(`✅ <b>Заказ оформлен</b>`);
+  lines.push(`Номер: <code>${order.orderId}</code>`);
+  lines.push(`Сумма: <b>${formatMoney(order.totalPrice)} ₽</b>`);
+  lines.push("");
+  lines.push(`Статус можно отслеживать по кнопке ниже.`);
+  return lines.join("\n");
+}
+
 /** ===== Route ===== */
 export async function POST(req: Request) {
   try {
@@ -205,9 +253,7 @@ export async function POST(req: Request) {
       status: "pending_payment" as const,
       createdAt: Date.now(),
       updatedAt: Date.now(),
-      statusHistory: [
-        { status: "pending_payment", at: Date.now(), by: "system" as const },
-      ],
+      statusHistory: [{ status: "pending_payment", at: Date.now(), by: "system" as const }],
       customer: {
         ...customer,
         name,
@@ -220,29 +266,39 @@ export async function POST(req: Request) {
 
     const redis = getRedisOrThrow();
 
-    // 1) заказ
     await redis.set(`order:${orderId}`, order, { ex: ORDER_TTL_SECONDS });
 
-    // 2) индекс для админки
     await redis.lpush("orders:latest", orderId);
     await redis.ltrim("orders:latest", 0, 199);
 
-    // 3) индекс для ЛК по пользователю
     await redis.lpush(`user:orders:${digits}`, orderId);
     await redis.ltrim(`user:orders:${digits}`, 0, 199);
 
     const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/+$/, "");
-    const orderUrl = `${siteUrl}/admin/orders/${orderId}`;
+    const adminOrderUrl = `${siteUrl}/admin/orders/${orderId}`;
+    const userOrderUrl = `${siteUrl}/order/${orderId}`;
 
-    // антидубль телеги
-    const notifyKey = `order:${orderId}:tg_created`;
-    const alreadyNotified = await redis.get(notifyKey);
-    if (!alreadyNotified) {
-      await sendAdminTelegram({
-        text: formatOrderText(order),
-        orderUrl,
-      });
-      await redis.set(notifyKey, 1, { ex: ORDER_TTL_SECONDS });
+    // ✅ Админам
+    const adminNotifyKey = `order:${orderId}:tg_admin_created`;
+    const adminAlready = await redis.get(adminNotifyKey);
+    if (!adminAlready) {
+      await sendAdminTelegram({ text: formatAdminOrderText(order), orderUrl: adminOrderUrl });
+      await redis.set(adminNotifyKey, 1, { ex: ORDER_TTL_SECONDS });
+    }
+
+    // ✅ Пользователю (если телефон привязан к TG)
+    const userNotifyKey = `order:${orderId}:tg_user_created`;
+    const userAlready = await redis.get(userNotifyKey);
+    if (!userAlready) {
+      const chatId = await redis.get<number>(`tg:phone:${digits}`);
+      if (chatId) {
+        await sendUserTelegram({
+          chatId,
+          text: formatUserOrderText({ orderId, totalPrice }),
+          orderUrl: userOrderUrl,
+        });
+      }
+      await redis.set(userNotifyKey, 1, { ex: ORDER_TTL_SECONDS });
     }
 
     const paymentUrl = `${siteUrl}/order/${orderId}`;
