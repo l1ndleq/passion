@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useCart } from "@/components/cart/CartProvider";
+import { getUserProfile, mergeUserProfile } from "@/app/lib/userProfile";
+
 
 type CheckoutForm = {
   name: string;
@@ -25,6 +27,20 @@ export default function CheckoutPage() {
     address: "",
     comment: "",
   });
+  useEffect(() => {
+  const p = getUserProfile();
+  if (!p) return;
+
+  setForm((prev) => ({
+    ...prev,
+    name: prev.name || p.name || "",
+    phone: prev.phone || p.phone || "",
+    telegram: prev.telegram || p.telegram || "",
+    city: prev.city || p.city || "",
+    address: prev.address || p.address || "",
+  }));
+}, []);
+
 
   const [loadingMe, setLoadingMe] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -130,6 +146,13 @@ export default function CheckoutPage() {
     })),
     totalPrice: total, // ← ВОТ ЭТО КРИТИЧНО
   }),
+});
+mergeUserProfile({
+  name: form.name,
+  phone: form.phone,
+  telegram: form.telegram,
+  city: form.city,
+  address: form.address,
 });
 
 
