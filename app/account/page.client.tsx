@@ -47,7 +47,12 @@ export default function AccountClient({ phone }: { phone: string }) {
   const [loadingOrders, setLoadingOrders] = useState(true);
   const [ordersError, setOrdersError] = useState<string | null>(null);
 
+  const [tgLinked, setTgLinked] = useState<boolean | null>(null);
+  const [tgError, setTgError] = useState<string | null>(null);
+
   const [trackValue, setTrackValue] = useState("");
+
+  const BOT_USERNAME = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || "";
 
   useEffect(() => {
     setProfile(
@@ -63,7 +68,7 @@ export default function AccountClient({ phone }: { phone: string }) {
   useEffect(() => {
     let alive = true;
 
-    async function load() {
+    async function loadOrders() {
       try {
         setLoadingOrders(true);
         setOrdersError(null);
@@ -90,7 +95,30 @@ export default function AccountClient({ phone }: { phone: string }) {
       }
     }
 
-    load();
+    async function loadTgStatus() {
+      try {
+        setTgError(null);
+        const r = await fetch("/api/account/telegram-status", { cache: "no-store" });
+        const j = await r.json().catch(() => null);
+        if (!alive) return;
+
+        if (!r.ok || !j?.ok) {
+          setTgLinked(null);
+          setTgError(j?.error || "TG_STATUS_FAILED");
+          return;
+        }
+
+        setTgLinked(Boolean(j.linked));
+      } catch {
+        if (!alive) return;
+        setTgLinked(null);
+        setTgError("TG_STATUS_FAILED");
+      }
+    }
+
+    loadOrders();
+    loadTgStatus();
+
     return () => {
       alive = false;
     };
@@ -119,6 +147,61 @@ export default function AccountClient({ phone }: { phone: string }) {
         <div className="text-sm text-black/60">Личный кабинет</div>
         <div className="text-2xl font-semibold">Мой аккаунт</div>
         <div className="mt-1 text-xs text-black/50">Вы вошли как: {phone}</div>
+      </div>
+
+      {/* Telegram */}
+      <div className="border border-black/10 rounded-2xl bg-white/40 p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div className="font-medium">Telegram</div>
+          <button
+            onClick={() => window.location.reload()}
+            className="text-xs text-black/50 hover:text-black transition"
+            type="button"
+          >
+            Обновить
+          </button>
+        </div>
+
+        {tgError ? (
+          <div className="mt-3 text-sm text-red-600">Ошибка проверки: {tgError}</div>
+        ) : tgLinked === null ? (
+          <div className="mt-3 text-sm text-black/50">Проверяем…</div>
+        ) : tgLinked ? (
+          <div className="mt-3 text-sm">
+            <span className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/60 px-3 py-1">
+              Привязан ✅
+            </span>
+            <div className="mt-2 text-xs text-black/50">
+              Коды входа будут приходить в Telegram, если номер совпадает.
+            </div>
+          </div>
+        ) : (
+          <div className="mt-3 text-sm">
+            <span className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/60 px-3 py-1">
+              Не привязан ❌
+            </span>
+
+            <div className="mt-2 text-xs text-black/50">
+              Привяжи Telegram — и коды входа будут приходить туда автоматически.
+            </div>
+
+            {BOT_USERNAME ? (
+              <a
+                className="mt-3 inline-flex items-center justify-center rounded-xl border px-3 py-2 text-sm hover:bg-white/70"
+                href={`https://t.me/${BOT_USERNAME}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Открыть бота и привязать
+              </a>
+            ) : (
+              <div className="mt-3 text-xs text-black/50">
+                Добавь env <code className="px-1 py-0.5 rounded bg-black/5">NEXT_PUBLIC_TELEGRAM_BOT_USERNAME</code>{" "}
+                (без @), чтобы показать кнопку.
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Профиль */}

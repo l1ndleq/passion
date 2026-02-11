@@ -5,8 +5,8 @@ import { Redis } from "@upstash/redis";
 
 const BOT_TOKEN = process.env.BOT_TOKEN!;
 const PUBLIC_SITE_URL = process.env.PUBLIC_SITE_URL!;
-const WEBHOOK_DOMAIN = process.env.WEBHOOK_DOMAIN!; // https://xxx.onrender.com (без / в конце)
-const WEBHOOK_PATH_RAW = process.env.WEBHOOK_PATH || "/telegram/webhook";
+const WEBHOOK_DOMAIN = process.env.WEBHOOK_DOMAIN!;
+const WEBHOOK_PATH = process.env.WEBHOOK_PATH || "/telegram/webhook";
 const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || "";
 const PORT = Number(process.env.PORT || 3001);
 
@@ -23,12 +23,10 @@ const redis = new Redis({
 
 function normalizePhone(raw: string) {
   let s = String(raw || "").trim().replace(/[^\d+]/g, "");
-
-  // RU нормализация к +7, чтобы сайт/бот совпадали по ключам
+  // RU -> +7
   if (s.startsWith("8") && s.length === 11) s = "+7" + s.slice(1);
   if (s.startsWith("7") && s.length === 11) s = "+7" + s.slice(1);
   if (s.startsWith("9") && s.length === 10) s = "+7" + s;
-
   return s;
 }
 
@@ -36,50 +34,22 @@ function phoneDigits(phone: string) {
   return String(phone || "").replace(/[^\d]/g, "");
 }
 
-async function linkPhoneToChat(phoneRaw: string, chatId: number) {
-  const phone = normalizePhone(phoneRaw);
+async function linkPhoneToChat(rawPhone: string, chatId: number) {
+  const phone = normalizePhone(rawPhone);
   const digits = phoneDigits(phone);
+  if (digits.length < 10) throw new Error("PHONE_INVALID");
 
-  // пишем сразу 2 ключа: с + и без + (чтобы никогда не промахнуться)
-  await redis.set(`tg:phone:${phone}`, chatId);
+  // ✅ ЕДИНЫЙ КЛЮЧ: tg:phone:<digits> -> chatId
   await redis.set(`tg:phone:${digits}`, chatId);
+  await redis.set(`tg:chat:${chatId}`, digits);
 
-  await redis.set(`tg:chat:${chatId}`, phone);
+  // (опционально) продублируем старый ключ на всякий случай
+  await redis.set(`tg:phone_raw:${phone}`, chatId);
 }
 
 const bot = new Telegraf(BOT_TOKEN);
 
-// /start и deep-link параметры
 bot.start(async (ctx) => {
-  const text = ctx.message?.text || "";
-  const parts = text.split(" ");
-  const startParam = parts[1] || ""; // /start <param>
-
-  // 1) Если это привязка: /start bind_<token>
-  if (startParam.startsWith("bind_")) {
-    const token = startParam.slice("bind_".length);
-
-    const phone = await redis.get<string>(`bind:${token}`);
-    if (!phone) {
-      await ctx.reply(
-        "Ссылка привязки устарела. Открой /account → Привязать Telegram ещё раз."
-      );
-      return;
-    }
-
-    const chatId = ctx.chat.id;
-    await linkPhoneToChat(phone, chatId);
-
-    // одноразовый токен
-    await redis.del(`bind:${token}`);
-
-    await ctx.reply(
-      `✅ Готово! Номер ${normalizePhone(phone)} привязан.\nТеперь коды входа будут приходить сюда.`
-    );
-    return;
-  }
-
-  // 2) Обычный старт: покажем кнопку "Войти"
   await ctx.reply(
     "👋 Добро пожаловать в Passion.\n\nНажми кнопку ниже, чтобы войти в личный кабинет.",
     Markup.inlineKeyboard([
@@ -89,7 +59,6 @@ bot.start(async (ctx) => {
   );
 });
 
-// Кнопка: запросить контакт
 bot.action("ASK_CONTACT", async (ctx) => {
   await ctx.answerCbQuery();
   await ctx.reply(
@@ -100,48 +69,29 @@ bot.action("ASK_CONTACT", async (ctx) => {
   );
 });
 
-// Получаем контакт
 bot.on("contact", async (ctx) => {
   const contact = ctx.message.contact;
-  const phone = normalizePhone(contact.phone_number);
   const chatId = ctx.chat.id;
 
-  if (!phone || phoneDigits(phone).length < 10) {
+  try {
+    await linkPhoneToChat(contact.phone_number, chatId);
+  } catch {
     await ctx.reply("Не удалось прочитать номер. Попробуй ещё раз.");
     return;
   }
 
-  await linkPhoneToChat(phone, chatId);
-
-  // уберём клавиатуру
-  await ctx.reply(
-    `✅ Номер ${phone} привязан.\nТеперь коды входа будут приходить сюда.`,
-    Markup.removeKeyboard()
-  );
-
+  await ctx.reply("✅ Номер привязан. Теперь коды входа будут приходить сюда.", Markup.removeKeyboard());
   await ctx.reply(
     "Открыть вход на сайт:",
-    Markup.inlineKeyboard([
-      Markup.button.url("🔐 Войти на сайт", `${PUBLIC_SITE_URL}/login?from=telegram`),
-    ])
+    Markup.inlineKeyboard([Markup.button.url("🔐 Войти на сайт", `${PUBLIC_SITE_URL}/login?from=telegram`)])
   );
 });
 
-// --------------------
-// Express + Webhook
-// --------------------
+// ---- Express webhook ----
 const app = express();
 app.use(express.json());
-
-// healthcheck
 app.get("/", (_req: Request, res: Response) => res.status(200).send("OK"));
 
-// нормализуем путь (на случай если в ENV без слэша)
-const WEBHOOK_PATH = WEBHOOK_PATH_RAW.startsWith("/")
-  ? WEBHOOK_PATH_RAW
-  : `/${WEBHOOK_PATH_RAW}`;
-
-// webhook handler (Telegram шлёт POST)
 app.post(WEBHOOK_PATH, (req: Request, res: Response, next: NextFunction) => {
   if (WEBHOOK_SECRET) {
     const secret = req.header("X-Telegram-Bot-Api-Secret-Token");
