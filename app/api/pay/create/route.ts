@@ -259,21 +259,22 @@ export async function POST(req: Request) {
 
     const orderId = makeOrderId();
 
-    const order = {
-      orderId,
-      status: "pending_payment" as const,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-      statusHistory: [{ status: "pending_payment", at: Date.now(), by: "system" as const }],
-      customer: {
-        ...customer,
-        name,
-        phone,
-        telegram: telegram ? telegram : null,
-      },
-      items,
-      totalPrice,
-    };
+const order = {
+  orderId,
+  status: "pending_payment" as const,
+  createdAt: Date.now(),
+  updatedAt: Date.now(),
+  statusHistory: [{ status: "pending_payment", at: Date.now(), by: "system" as const }],
+  customer: {
+    ...customer,
+    name,
+    phone,
+    telegram: telegram ? telegram : null,
+  },
+  items,
+  totalPrice,
+};
+
 
     const redis = getRedisOrThrow();
 
