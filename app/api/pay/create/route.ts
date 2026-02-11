@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { Redis } from "@upstash/redis";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 const ORDER_TTL_SECONDS = 60 * 60 * 24; // 24 часа
 
@@ -34,17 +35,14 @@ function getRedisOrThrow() {
   const token = process.env.UPSTASH_REDIS_REST_TOKEN;
 
   if (!url || !token) {
-    throw new Error(
-      "Upstash env missing: UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN"
-    );
+    throw new Error("Upstash env missing: UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN");
   }
 
   return new Redis({ url, token });
 }
 
-/** Каноничная нормализация телефона (как в OTP/боте) */
 function normalizePhone(raw: string) {
-  let s = String(raw ?? "").trim().replace(/[^\d+]/g, "");
+  let s = String(raw || "").trim().replace(/[^\d+]/g, "");
 
   // RU -> +7
   if (s.startsWith("8") && s.length === 11) s = "+7" + s.slice(1);
@@ -55,7 +53,7 @@ function normalizePhone(raw: string) {
 }
 
 function phoneDigits(phone: string) {
-  return String(phone ?? "").replace(/[^\d]/g, "");
+  return String(phone || "").replace(/[^\d]/g, "");
 }
 
 function isValidPhone(raw: string) {
@@ -64,8 +62,7 @@ function isValidPhone(raw: string) {
   return digits.length >= 10 && digits.length <= 15;
 }
 
-/** ===== Telegram helpers ===== */
-
+/** ===== Telegram helpers (админ-уведомления) ===== */
 function getChatIds() {
   const raw = process.env.TELEGRAM_CHAT_IDS || "";
   return raw
@@ -78,13 +75,9 @@ async function sendTelegram(text: string) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const chatIds = getChatIds();
 
-  // не ломаем создание заказа, если телега не настроена
-  if (!token || chatIds.length === 0) {
-    console.warn("Telegram env missing: TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_IDS");
-    return;
-  }
+  if (!token || chatIds.length === 0) return;
 
-  const results = await Promise.all(
+  await Promise.all(
     chatIds.map(async (chat_id) => {
       const r = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
         method: "POST",
@@ -100,13 +93,8 @@ async function sendTelegram(text: string) {
       if (!r.ok || !j?.ok) {
         console.error("Telegram send failed:", { chat_id, status: r.status, resp: j });
       }
-      return { ok: r.ok && Boolean(j?.ok) };
     })
   );
-
-  if (!results.some((x) => x.ok)) {
-    console.error("Telegram: all sends failed");
-  }
 }
 
 function formatMoney(n: number) {
@@ -163,69 +151,44 @@ function formatOrderText(order: {
 }
 
 /** ===== Route ===== */
-
 export async function POST(req: Request) {
   try {
     const body = (await req.json()) as CreatePayBody;
 
     const totalPrice = Number(body?.totalPrice ?? 0);
     if (!Number.isFinite(totalPrice) || totalPrice <= 0) {
-      return NextResponse.json(
-        { ok: false, error: "totalPrice must be a positive number" },
-        { status: 400 }
-      );
+      return NextResponse.json({ ok: false, error: "TOTAL_INVALID" }, { status: 400 });
     }
 
     const items = Array.isArray(body?.items) ? body.items : [];
     if (items.length === 0) {
-      return NextResponse.json(
-        { ok: false, error: "items must be a non-empty array" },
-        { status: 400 }
-      );
+      return NextResponse.json({ ok: false, error: "ITEMS_REQUIRED" }, { status: 400 });
     }
 
-    // ✅ customer validation
     const customer = body.customer ?? {};
     const name = String(customer.name ?? "").trim();
     const phoneRaw = String(customer.phone ?? "").trim();
-    const phone = normalizePhone(phoneRaw);
 
-    const telegramRaw =
-      customer.telegram == null ? "" : String(customer.telegram).trim();
+    if (!name) return NextResponse.json({ ok: false, error: "NAME_REQUIRED" }, { status: 400 });
+    if (!phoneRaw) return NextResponse.json({ ok: false, error: "PHONE_REQUIRED" }, { status: 400 });
+    if (!isValidPhone(phoneRaw)) return NextResponse.json({ ok: false, error: "PHONE_INVALID" }, { status: 400 });
+
+    const phone = normalizePhone(phoneRaw);
+    const digits = phoneDigits(phone);
+
+    const telegramRaw = customer.telegram == null ? "" : String(customer.telegram).trim();
     const telegram = telegramRaw.replace(/^@/, "");
 
-    if (!name) {
-      return NextResponse.json(
-        { ok: false, error: "NAME_REQUIRED" },
-        { status: 400 }
-      );
-    }
-
-    if (!phone) {
-      return NextResponse.json(
-        { ok: false, error: "PHONE_REQUIRED" },
-        { status: 400 }
-      );
-    }
-
-    if (!isValidPhone(phone)) {
-      return NextResponse.json(
-        { ok: false, error: "PHONE_INVALID" },
-        { status: 400 }
-      );
-    }
-
     const orderId = makeOrderId();
-    const createdAt = Date.now();
 
     const order = {
       orderId,
-      status: "pending_payment" as const, // ⏳ сейчас заявка/не оплачено
-      createdAt,
+      status: "pending_payment" as const,
+      createdAt: Date.now(),
       customer: {
         ...customer,
         name,
-        phone, // ✅ каноничный формат (+7...)
+        phone, // ✅ канонический +7
         telegram: telegram ? telegram : null,
       },
       items,
@@ -234,19 +197,18 @@ export async function POST(req: Request) {
 
     const redis = getRedisOrThrow();
 
-    // 1) сохраняем заказ
+    // 1) сам заказ
     await redis.set(`order:${orderId}`, order, { ex: ORDER_TTL_SECONDS });
 
-    // 2) ✅ индекс для админки: последние заказы
+    // 2) индекс для админки
     await redis.lpush("orders:latest", orderId);
-    await redis.ltrim("orders:latest", 0, 199); // последние 200
+    await redis.ltrim("orders:latest", 0, 199);
 
-    // 3) ✅ индекс для ЛК: заказы пользователя по телефону (ZSET)
-    // user:orders:<digits> => member=orderId, score=createdAt
-    const userOrdersKey = `user:orders:${phoneDigits(phone)}`;
-    await redis.zadd(userOrdersKey, { score: createdAt, member: orderId });
+    // ✅ 3) индекс для ЛК по пользователю (ВАЖНО)
+    await redis.lpush(`user:orders:${digits}`, orderId);
+    await redis.ltrim(`user:orders:${digits}`, 0, 199);
 
-    // 4) ✅ Telegram: отправляем 1 раз на orderId (антидубль)
+    // антидубль телеги
     const notifyKey = `order:${orderId}:tg_created`;
     const alreadyNotified = await redis.get(notifyKey);
     if (!alreadyNotified) {
@@ -254,36 +216,17 @@ export async function POST(req: Request) {
       await redis.set(notifyKey, 1, { ex: ORDER_TTL_SECONDS });
     }
 
-    const siteUrl = (
-      process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
-    ).replace(/\/+$/, "");
+    const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/+$/, "");
     const paymentUrl = `${siteUrl}/order/${orderId}`;
 
     return NextResponse.json({ ok: true, orderId, paymentUrl });
-  } catch (e: unknown) {
-    const message = e instanceof Error ? e.message : String(e);
-    console.error("PAY CREATE ERROR:", message, e);
-
-    return NextResponse.json(
-      {
-        ok: false,
-        error: message,
-        debug: {
-          hasUpstashUrl: Boolean(process.env.UPSTASH_REDIS_REST_URL),
-          hasUpstashToken: Boolean(process.env.UPSTASH_REDIS_REST_TOKEN),
-          hasSiteUrl: Boolean(process.env.NEXT_PUBLIC_SITE_URL),
-          hasTgToken: Boolean(process.env.TELEGRAM_BOT_TOKEN),
-          hasTgChats: Boolean(process.env.TELEGRAM_CHAT_IDS),
-        },
-      },
-      { status: 500 }
-    );
+  } catch (e: any) {
+    const message = e?.message || "PAY_CREATE_FAILED";
+    console.error("PAY CREATE ERROR:", message);
+    return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }
 }
 
 export async function GET() {
-  return NextResponse.json(
-    { ok: false, error: "Method Not Allowed" },
-    { status: 405 }
-  );
+  return NextResponse.json({ ok: false, error: "Method Not Allowed" }, { status: 405 });
 }
