@@ -1,7 +1,6 @@
 import "./globals.css";
 import Link from "next/link";
 import Image from "next/image";
-import AppProviders from "./providers";
 import { StickyHeader } from "@/components/StickyHeader";
 import SearchBarClientOnly from "@/components/SearchBarClientOnly";
 import MobileSearchClientOnly from "@/components/MobileSearchClientOnly";

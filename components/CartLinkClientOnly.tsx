@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useCart } from "@/components/cart/CartProvider";
 
 type Props = {
   className?: string;
