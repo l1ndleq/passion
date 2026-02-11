@@ -1,5 +1,6 @@
 import "./globals.css";
 import Link from "next/link";
+import Image from "next/image";
 import AppProviders from "./providers";
 import { StickyHeader } from "@/components/StickyHeader";
 import SearchBarClientOnly from "@/components/SearchBarClientOnly";
@@ -33,7 +34,6 @@ const NAV_LINK =
   "after:origin-left after:scale-x-0 after:bg-black/60 " +
   "after:transition-transform after:duration-300 hover:after:scale-x-100";
 
-// layout — Server Component
 const CURRENT_YEAR = new Date().getFullYear();
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -45,7 +45,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <StickyHeader>
               <header className="border-b border-black/10 bg-white/60 backdrop-blur">
                 <div className="mx-auto flex h-12 max-w-6xl items-center px-5 relative">
-                  {/* MOBILE: left burger */}
+                  {/* MOBILE LEFT */}
                   <div className="md:hidden">
                     <MobileMenu />
                   </div>
@@ -55,28 +55,33 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                     <Link href="/" className={NAV_LINK}>
                       Главная
                     </Link>
-
                     <Link href="/products" className={NAV_LINK}>
                       Каталог
                     </Link>
-
                     <Link href="/contact" className={NAV_LINK}>
                       Контакты
                     </Link>
-
-                    <CartLinkClientOnly className={NAV_LINK} />
+                    <CartLinkClientOnly className={NAV_LINK} variant="text" />
                     <Link href="/account" className={NAV_LINK}>
                       Кабинет
                     </Link>
                   </nav>
 
-                  {/* CENTER LOGO (mobile + desktop) */}
+                  {/* CENTER LOGO (image) */}
                   <div className="absolute left-1/2 -translate-x-1/2">
                     <Link
                       href="/"
-                      className="text-[13px] uppercase tracking-[0.32em] text-black/80 hover:text-black transition-colors"
+                      aria-label="На главную"
+                      className="inline-flex items-center justify-center min-h-[44px]"
                     >
-                      passion
+                      <Image
+                        src="/logo.png"
+                        alt="Passion"
+                        width={120}
+                        height={24}
+                        priority
+                        className="h-[18px] w-auto opacity-90"
+                      />
                     </Link>
                   </div>
 
@@ -88,9 +93,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                     <SearchBarClientOnly className="w-full" />
                   </div>
 
-                  {/* MOBILE RIGHT: cart + search */}
+                  {/* MOBILE RIGHT */}
                   <div className="md:hidden ml-auto flex items-center gap-1">
-                    <CartLinkClientOnly className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-[11px] uppercase tracking-[0.22em] text-black/70 hover:text-black" />
+                    <CartLinkClientOnly variant="icon" />
                     <MobileSearchClientOnly />
                   </div>
                 </div>
