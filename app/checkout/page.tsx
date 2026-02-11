@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useCart } from "@/components/cart/CartProvider";
 import { getUserProfile, mergeUserProfile } from "@/app/lib/userProfile";
+import { useRef } from "react";
+
 
 
 type CheckoutForm = {
@@ -27,6 +29,47 @@ export default function CheckoutPage() {
     address: "",
     comment: "",
   });
+  const lastLoadedDigitsRef = useRef<string>("");
+
+useEffect(() => {
+  const raw = form.phone || "";
+  const digits = raw.replace(/[^\d]/g, "");
+
+  if (digits.length < 10) return;
+
+  const t = setTimeout(async () => {
+    if (lastLoadedDigitsRef.current === digits) return;
+
+    try {
+      const r = await fetch(`/api/profile?phone=${encodeURIComponent(form.phone)}`);
+      const j = await r.json().catch(() => null);
+
+      if (!r.ok || !j?.ok || !j?.profile) return;
+
+      lastLoadedDigitsRef.current = digits;
+
+      const p = j.profile as {
+        name?: string;
+        telegram?: string | null;
+        city?: string;
+        address?: string;
+      };
+
+      setForm((prev) => ({
+        ...prev,
+        name: prev.name || p.name || "",
+        telegram: prev.telegram || (p.telegram || "") || "",
+        city: prev.city || p.city || "",
+        address: prev.address || p.address || "",
+      }));
+    } catch (e) {
+      console.warn("profile autofill failed", e);
+    }
+  }, 350);
+
+  return () => clearTimeout(t);
+}, [form.phone]);
+
   useEffect(() => {
   const p = getUserProfile();
   if (!p) return;

@@ -272,6 +272,21 @@ const order = {
 
     const redis = getRedisOrThrow();
 
+    // ✅ сохраняем профиль пользователя для автозаполнения checkout
+const PROFILE_TTL_SECONDS = 60 * 60 * 24 * 365; // 1 год
+await redis.set(
+  `user:profile:${digits}`,
+  {
+    name,
+    phone,
+    telegram: telegram ? telegram : null,
+    city: customer.city ?? "",
+    address: customer.address ?? "",
+  },
+  { ex: PROFILE_TTL_SECONDS }
+);
+
+
     await redis.set(`order:${orderId}`, order, { ex: ORDER_TTL_SECONDS });
 
     await redis.lpush("orders:latest", orderId);
