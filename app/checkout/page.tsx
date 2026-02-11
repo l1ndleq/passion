@@ -123,7 +123,7 @@ export default function CheckoutPage() {
     },
     items: items.map((i) => ({
       id: i.id,
-      title: i.title || i.name,
+      title: i.name,
       price: i.price,
       qty: i.qty,
       image: i.image,
