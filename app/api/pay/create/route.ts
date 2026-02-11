@@ -153,7 +153,7 @@ async function sendUserTelegram({
   body: JSON.stringify({
    customer: {
   name: name,
-  phone: phone,
+  phone: normalizePhone(String(customer.phone ?? "")),
   telegram: telegram,
   city: customer.city,
   address: customer.address,
