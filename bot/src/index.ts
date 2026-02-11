@@ -92,13 +92,24 @@ const app = express();
 app.use(express.json());
 app.get("/", (_req: Request, res: Response) => res.status(200).send("OK"));
 
-app.post(WEBHOOK_PATH, (req: Request, res: Response, next: NextFunction) => {
+app.post("/telegram/webhook", (req, res) => {
+  // ✅ секрет проверяем быстро, ДО ответа
   if (WEBHOOK_SECRET) {
     const secret = req.header("X-Telegram-Bot-Api-Secret-Token");
-    if (secret !== WEBHOOK_SECRET) return res.status(401).send("Unauthorized");
+    if (secret !== WEBHOOK_SECRET) {
+      return res.status(401).send("Unauthorized");
+    }
   }
-  return bot.webhookCallback(WEBHOOK_PATH)(req, res, next);
+
+  // ✅ СРАЗУ подтверждаем Telegram
+  res.status(200).send("OK");
+
+  // ✅ обработка апдейта после ответа
+  bot.handleUpdate(req.body).catch((e) => {
+    console.error("handleUpdate failed", e);
+  });
 });
+
 
 async function start() {
   const domain = WEBHOOK_DOMAIN.replace(/\/+$/, "");
