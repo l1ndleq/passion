@@ -1,40 +1,35 @@
 import { NextResponse } from "next/server";
 import { redis } from "@/app/lib/redis";
 
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 export async function POST(req: Request) {
   try {
-    // ✅ надёжно получаем orderId из URL
-    const pathname = new URL(req.url).pathname; // /api/admin/orders/P-MLFI29FC/status
+    // ✅ orderId из URL
+    const pathname = new URL(req.url).pathname;
     const parts = pathname.split("/").filter(Boolean);
-    const orderId = (parts[parts.length - 2] || "").trim(); // <- предпоследний сегмент
+    const orderId = (parts[parts.length - 2] || "").trim();
 
     if (!orderId) {
-      return NextResponse.json(
-        { ok: false, error: "ORDER_ID_REQUIRED" },
-        { status: 400 }
-      );
+      return NextResponse.json({ ok: false, error: "ORDER_ID_REQUIRED" }, { status: 400 });
     }
 
     const body = await req.json().catch(() => ({}));
     const status = String(body?.status || "").trim();
 
     if (!status) {
-      return NextResponse.json(
-        { ok: false, error: "STATUS_REQUIRED" },
-        { status: 400 }
-      );
+      return NextResponse.json({ ok: false, error: "STATUS_REQUIRED" }, { status: 400 });
     }
 
     const key = `order:${orderId}`;
     const order = await redis.get<any>(key);
 
     if (!order) {
-      return NextResponse.json(
-        { ok: false, error: "NOT_FOUND" },
-        { status: 404 }
-      );
+      return NextResponse.json({ ok: false, error: "NOT_FOUND" }, { status: 404 });
     }
 
+    const prevStatus = String(order.status || "");
     const updated = {
       ...order,
       status,
@@ -42,73 +37,27 @@ export async function POST(req: Request) {
     };
 
     await redis.set(key, updated);
-    // ✅ уведомление в TG после успешного сохранения
-await notifyTelegramStatusChange({
-  orderId,
-  status,
-  totalPrice: updated.totalPrice,
-  customerName: updated.customer?.name,
-}).catch((e) => {
-  console.error("TG notify failed", e);
-});
-async function notifyTelegramStatusChange({
-  orderId,
-  status,
-  totalPrice,
-  customerName,
-}: {
-  orderId: string;
-  status: string;
-  totalPrice?: number;
-  customerName?: string;
-}) {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
-  const chatIdsRaw = process.env.TELEGRAM_CHAT_IDS || process.env.TELEGRAM_CHAT_ID;
 
-  if (!token || !chatIdsRaw) {
-    // если нет переменных — просто молча выходим (не ломаем админку)
-    return;
-  }
+    // ✅ Если статус реально изменился — шлём уведомления через наш рабочий endpoint
+    if (prevStatus !== status) {
+      const site = (process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/+$/, "");
+      const url = site ? `${site}/api/account/orders/status` : null;
 
-  const chatIds = chatIdsRaw
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-
-  const text =
-    `📦 <b>Статус заказа изменён</b>\n` +
-    `Заказ: <code>${orderId}</code>\n` +
-    `Новый статус: <b>${status}</b>\n` +
-    (customerName ? `Клиент: ${escapeHtml(customerName)}\n` : "") +
-    (typeof totalPrice === "number" ? `Сумма: ${totalPrice} ₽\n` : "");
-
-  // отправляем во все чаты
-  await Promise.all(
-    chatIds.map(async (chatId) => {
-      const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chat_id: chatId,
-          text,
-          parse_mode: "HTML",
-          disable_web_page_preview: true,
-        }),
-      });
-
-      // если телега вернула ошибку — логируем в консоль сервера (Vercel/локально)
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        console.error("TG sendMessage failed", { chatId, status: res.status, data });
+      if (url) {
+        await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-admin-secret": process.env.ADMIN_SECRET || "",
+          },
+          body: JSON.stringify({ orderId, status }),
+        }).catch((e) => {
+          console.error("Notify endpoint failed:", e);
+        });
+      } else {
+        console.error("NEXT_PUBLIC_SITE_URL missing: cannot call notify endpoint");
       }
-    })
-  );
-}
-
-function escapeHtml(s: string) {
-  return s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
-}
-
+    }
 
     return NextResponse.json({ ok: true, order: updated });
   } catch (e: any) {
