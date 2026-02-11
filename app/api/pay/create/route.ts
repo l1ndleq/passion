@@ -151,14 +151,15 @@ async function sendUserTelegram({
   method: "POST",
   headers: { "Content-Type": "application/json" },
   body: JSON.stringify({
-    customer: {
-      name,
-      phone,
-      telegram,
-      city,
-      address,
-      message: comment, // важно: backend ждёт message, не comment
-    },
+   customer: {
+  name: name,
+  phone: phone,
+  telegram: telegram,
+  city: customer.city,
+  address: customer.address,
+  message: customer.message,
+},
+
     items: cartItems, // как у тебя уже есть
     totalPrice: total, // ВАЖНО: backend ждёт totalPrice
   }),
