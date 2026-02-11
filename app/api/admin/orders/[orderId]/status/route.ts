@@ -4,10 +4,15 @@ import { redis } from "@/app/lib/redis";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
+type StatusEntry = {
+  status: string;
+  at: number;
+  by: "admin";
+};
+
 export async function POST(req: Request) {
   try {
-    // ✅ orderId из URL
-    const pathname = new URL(req.url).pathname;
+    const pathname = new URL(req.url).pathname; // /api/admin/orders/P-XXX/status
     const parts = pathname.split("/").filter(Boolean);
     const orderId = (parts[parts.length - 2] || "").trim();
 
@@ -30,33 +35,41 @@ export async function POST(req: Request) {
     }
 
     const prevStatus = String(order.status || "");
+    if (prevStatus === status) {
+      return NextResponse.json({ ok: true, order });
+    }
+
+    const history: StatusEntry[] = Array.isArray(order.statusHistory) ? order.statusHistory : [];
+
     const updated = {
       ...order,
       status,
       updatedAt: Date.now(),
+      statusHistory: [
+        ...history,
+        {
+          status,
+          at: Date.now(),
+          by: "admin" as const,
+        },
+      ],
     };
 
     await redis.set(key, updated);
 
-    // ✅ Если статус реально изменился — шлём уведомления через наш рабочий endpoint
-    if (prevStatus !== status) {
-      const site = (process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/+$/, "");
-      const url = site ? `${site}/api/account/orders/status` : null;
-
-      if (url) {
-        await fetch(url, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-admin-secret": process.env.ADMIN_SECRET || "",
-          },
-          body: JSON.stringify({ orderId, status }),
-        }).catch((e) => {
-          console.error("Notify endpoint failed:", e);
-        });
-      } else {
-        console.error("NEXT_PUBLIC_SITE_URL missing: cannot call notify endpoint");
-      }
+    // ✅ уведомление через единый endpoint
+    const site = (process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/+$/, "");
+    if (site) {
+      await fetch(`${site}/api/account/orders/status`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-secret": process.env.ADMIN_SECRET || "",
+        },
+        body: JSON.stringify({ orderId, status }),
+      }).catch((e) => console.error("Notify endpoint failed:", e));
+    } else {
+      console.error("NEXT_PUBLIC_SITE_URL missing: cannot notify");
     }
 
     return NextResponse.json({ ok: true, order: updated });
