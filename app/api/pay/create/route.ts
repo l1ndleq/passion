@@ -86,21 +86,24 @@ function getAdminChatIds() {
     .filter(Boolean);
 }
 
-async function sendAdminTelegram({
-  text,
-  orderUrl,
-}: {
-  text: string;
-  orderUrl: string;
-}) {
+async function sendAdminTelegram({ text, orderUrl }: { text: string; orderUrl: string }) {
   const token = process.env.TELEGRAM_ADMIN_BOT_TOKEN;
   const chatIds = getAdminChatIds();
 
-  if (!token || chatIds.length === 0) return;
+  if (!token) {
+    console.warn("TELEGRAM_ADMIN_BOT_TOKEN missing");
+    return false;
+  }
+  if (chatIds.length === 0) {
+    console.warn("TELEGRAM_CHAT_IDS missing/empty");
+    return false;
+  }
 
   const keyboard = orderUrl
     ? { inline_keyboard: [[{ text: "Открыть заказ", url: orderUrl }]] }
     : undefined;
+
+  let okCount = 0;
 
   await Promise.all(
     chatIds.map(async (chat_id) => {
@@ -117,12 +120,15 @@ async function sendAdminTelegram({
       });
 
       const j = await r.json().catch(() => null);
-      if (!r.ok || !j?.ok) {
-        console.error("Admin Telegram send failed:", { chat_id, status: r.status, resp: j });
-      }
+
+      if (r.ok && j?.ok) okCount += 1;
+      else console.error("Admin Telegram send failed:", { chat_id, status: r.status, resp: j });
     })
   );
+
+  return okCount > 0;
 }
+
 
 /** ===== Telegram: User (PassionLoginBot) ===== */
 async function sendUserTelegram({
@@ -141,17 +147,22 @@ async function sendUserTelegram({
     ? { inline_keyboard: [[{ text: "Открыть заказ", url: orderUrl }]] }
     : undefined;
 
-  const r = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text,
-      parse_mode: "HTML",
-      disable_web_page_preview: true,
-      ...(keyboard ? { reply_markup: keyboard } : {}),
-    }),
-  });
+  const r = await fetch("/api/pay/create", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    customer: {
+      name,
+      phone,
+      telegram,
+      city,
+      address,
+      message: comment, // важно: backend ждёт message, не comment
+    },
+    items: cartItems, // как у тебя уже есть
+    totalPrice: total, // ВАЖНО: backend ждёт totalPrice
+  }),
+});
 
   const j = await r.json().catch(() => null);
   if (!r.ok || !j?.ok) {
@@ -280,11 +291,15 @@ export async function POST(req: Request) {
 
     // ✅ Админам
     const adminNotifyKey = `order:${orderId}:tg_admin_created`;
-    const adminAlready = await redis.get(adminNotifyKey);
-    if (!adminAlready) {
-      await sendAdminTelegram({ text: formatAdminOrderText(order), orderUrl: adminOrderUrl });
-      await redis.set(adminNotifyKey, 1, { ex: ORDER_TTL_SECONDS });
-    }
+const adminAlready = await redis.get(adminNotifyKey);
+
+if (!adminAlready) {
+  const sent = await sendAdminTelegram({ text: formatAdminOrderText(order), orderUrl: adminOrderUrl });
+  if (sent) {
+    await redis.set(adminNotifyKey, 1, { ex: ORDER_TTL_SECONDS });
+  }
+}
+
 
     // ✅ Пользователю (если телефон привязан к TG)
     const userNotifyKey = `order:${orderId}:tg_user_created`;

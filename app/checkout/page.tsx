@@ -1,207 +1,259 @@
 "use client";
 
-import { useState } from "react";
-import { useCart } from "../cart-context";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useCart } from "@/components/cart/CartProvider";
 
-const normalizePhone = (s: string) => String(s ?? "").replace(/[^\d+]/g, "").trim();
-
-// простая проверка: 10–15 цифр
-const isValidPhone = (raw: string) => {
-  const p = normalizePhone(raw);
-  const digits = p.replace(/\D/g, "");
-  return digits.length >= 10 && digits.length <= 15;
+type CheckoutForm = {
+  name: string;
+  phone: string;
+  telegram?: string;
+  city?: string;
+  address?: string;
+  comment?: string;
 };
 
 export default function CheckoutPage() {
-  const { items, totalPrice } = useCart();
+  const router = useRouter();
+  const { items, total, clearCart } = useCart();
 
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState(""); // ✅ обязательный
-  const [telegram, setTelegram] = useState(""); // ✅ опциональный
+  const [form, setForm] = useState<CheckoutForm>({
+    name: "",
+    phone: "",
+    telegram: "",
+    city: "",
+    address: "",
+    comment: "",
+  });
 
-  const [city, setCity] = useState("");
-  const [address, setAddress] = useState("");
-  const [message, setMessage] = useState("");
-
-  const [loading, setLoading] = useState(false);
+  const [loadingMe, setLoadingMe] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function submit() {
-    if (!items.length) {
-      setError("Корзина пуста");
-      return;
-    }
+  const isCartEmpty = useMemo(() => !items || items.length === 0, [items]);
 
-    const nameTrim = name.trim();
-    const phoneTrim = phone.trim();
-    const telegramTrim = telegram.trim().replace(/^@/, "");
+  // ✅ Автозаполнение из ЛК (если /api/me отдаёт профиль)
+  useEffect(() => {
+    let cancelled = false;
 
-    if (!nameTrim) {
-      setError("Укажите имя");
-      return;
-    }
+    (async () => {
+      try {
+        setLoadingMe(true);
+        const res = await fetch("/api/me", { cache: "no-store" });
+        if (!res.ok) return;
 
-    if (!phoneTrim) {
-      setError("Укажите номер телефона");
-      return;
-    }
+        const me = (await res.json()) as Partial<CheckoutForm>;
+        if (cancelled) return;
 
-    if (!isValidPhone(phoneTrim)) {
-      setError("Введите корректный номер телефона");
-      return;
-    }
+        setForm((prev) => ({
+          ...prev,
+          name: me.name ?? prev.name,
+          phone: me.phone ?? prev.phone,
+          telegram: me.telegram ?? prev.telegram,
+          city: me.city ?? prev.city,
+          address: me.address ?? prev.address,
+        }));
+      } catch {
+      } finally {
+        if (!cancelled) setLoadingMe(false);
+      }
+    })();
 
-    setLoading(true);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  function setField<K extends keyof CheckoutForm>(key: K, value: CheckoutForm[K]) {
+    setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function validate(): string | null {
+    if (!form.name.trim()) return "Введите имя";
+    if (!form.phone.trim()) return "Введите телефон";
+
+    const digits = form.phone.replace(/\D/g, "");
+    if (digits.length < 10) return "Телефон введён некорректно";
+
+    if (isCartEmpty) return "Корзина пуста";
+    return null;
+  }
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
     setError(null);
 
+    const v = validate();
+    if (v) return setError(v);
+
+    setSubmitting(true);
+
     try {
-      const res = await fetch(`${window.location.origin}/api/pay/create`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          customer: {
-            name: nameTrim,
-            phone: normalizePhone(phoneTrim), // ✅ нормализованный
-            telegram: telegramTrim || null, // ✅ опционально
-            city: city.trim(),
-            address: address.trim(),
-            message: message.trim(),
-          },
-          items: items.map((i) => ({
-            id: i.id,
-            title: i.title,
-            price: i.price,
-            qty: i.qty,
-            image: i.image, // если есть
-          })),
-          totalPrice,
-        }),
-      });
+      const payload = {
+        customer: {
+          name: form.name.trim(),
+          phone: form.phone.trim(),
+          telegram: (form.telegram || "").trim() || undefined,
+          city: (form.city || "").trim() || undefined,
+          address: (form.address || "").trim() || undefined,
+        },
+        comment: (form.comment || "").trim() || undefined,
 
-      const data = await res.json().catch(() => null);
+        // ✅ Корзина (под /api/pay/create)
+    items: items.map((it) => ({
+  id: it.id,
+  name: it.name,
+  price: it.price,
+  quantity: it.qty, // 👈 ВАЖНО
+})),
+        total,
+      };
 
-      if (!res.ok || !data?.ok) {
-        // поддержка кодов ошибок из API
-        if (data?.error === "NAME_REQUIRED") throw new Error("Укажите имя");
-        if (data?.error === "PHONE_REQUIRED") throw new Error("Укажите номер телефона");
-        if (data?.error === "PHONE_INVALID") throw new Error("Введите корректный номер телефона");
+      const res = await fetch("/api/pay/create", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    customer: {
+      name: form.name,
+      phone: form.phone,
+      telegram: form.telegram || null,
+      city: form.city || "",
+      address: form.address || "",
+      message: form.comment || "",
+    },
+    items: items.map((i) => ({
+      id: i.id,
+      title: i.title || i.name,
+      price: i.price,
+      qty: i.qty,
+      image: i.image,
+    })),
+    totalPrice: total, // ← ВОТ ЭТО КРИТИЧНО
+  }),
+});
 
-        throw new Error(data?.error || "Не удалось создать оплату");
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(data?.error || data?.message || "Не удалось создать заказ");
       }
 
-      if (!data?.paymentUrl || typeof data.paymentUrl !== "string") {
-        throw new Error("paymentUrl не пришёл с сервера");
+      // ✅ Очистка корзины после заказа
+      clearCart();
+
+      // ✅ Редирект
+      if (data?.paymentUrl) {
+        window.location.href = data.paymentUrl;
+        return;
       }
 
-      const url = data.paymentUrl.startsWith("http")
-        ? data.paymentUrl
-        : `${window.location.origin}${data.paymentUrl}`;
+      if (data?.orderId) {
+        router.push(`/order/${data.orderId}`);
+        return;
+      }
 
-      window.location.assign(url);
-    } catch (e: any) {
-      setError(e?.message || "Ошибка оформления заказа");
-    } finally {
-      setLoading(false);
+      throw new Error("Сервер не вернул paymentUrl или orderId");
+    } catch (err: any) {
+      setError(err?.message || "Ошибка оформления заказа");
+      setSubmitting(false);
     }
   }
 
   return (
-    <div className="p-6 max-w-2xl mx-auto">
-      <div className="text-[10px] tracking-[0.22em] uppercase opacity-60">
-        PASSION / CHECKOUT
-      </div>
-
-      <h1 className="mt-3 text-3xl leading-tight">Оформление заказа</h1>
-      <div className="mt-2 text-xs opacity-60">BUILD: checkout-v5</div>
-
-      {/* Корзина */}
-      <div className="mt-6 space-y-3">
-        {items.map((item) => (
-          <div
-            key={item.id}
-            className="flex items-center justify-between border rounded-xl p-3"
-          >
-            <div>
-              <div className="text-sm font-medium">{item.title}</div>
-              <div className="text-xs opacity-60">
-                {item.qty} × {item.price} ₽
-              </div>
-            </div>
-            <div className="text-sm font-semibold">{item.qty * item.price} ₽</div>
-          </div>
-        ))}
-
-        <div className="flex justify-between pt-4 text-sm font-semibold">
-          <div>Итого</div>
-          <div>{totalPrice} ₽</div>
+    <main className="mx-auto max-w-3xl px-4 py-10">
+      <div className="mb-6 flex items-center justify-between">
+        <h1 className="text-xl font-semibold">Оформление заказа</h1>
+        <div className="text-sm text-neutral-600">
+          Итого: <span className="font-medium text-neutral-900">{total} ₽</span>
         </div>
       </div>
 
-      {/* Форма */}
-      <div className="mt-8 space-y-4">
-        <input
-          placeholder="Имя *"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          className="w-full border rounded-xl px-4 py-3 text-sm"
-          required
-          autoComplete="name"
-        />
+      {isCartEmpty ? (
+        <div className="rounded-2xl border border-neutral-200 bg-white p-6">
+          <div className="text-sm text-neutral-700">Корзина пуста.</div>
+          <button
+            className="mt-4 inline-flex rounded-full bg-black px-5 py-2.5 text-sm font-medium text-white"
+            onClick={() => router.push("/products")}
+          >
+            Перейти в каталог
+          </button>
+        </div>
+      ) : (
+        <form onSubmit={onSubmit} className="rounded-2xl border border-neutral-200 bg-white p-5 sm:p-6">
+          <div className="grid gap-3">
+            <input
+              className="h-12 rounded-xl border border-neutral-200 px-4 text-sm outline-none focus:border-neutral-400"
+              placeholder="Имя *"
+              value={form.name}
+              onChange={(e) => setField("name", e.target.value)}
+              autoComplete="name"
+              disabled={submitting}
+            />
 
-        <input
-          placeholder="Телефон *"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          className="w-full border rounded-xl px-4 py-3 text-sm"
-          required
-          inputMode="tel"
-          autoComplete="tel"
-        />
+            <input
+              className="h-12 rounded-xl border border-neutral-200 px-4 text-sm outline-none focus:border-neutral-400"
+              placeholder="Телефон *"
+              value={form.phone}
+              onChange={(e) => setField("phone", e.target.value)}
+              autoComplete="tel"
+              disabled={submitting}
+            />
 
-        <input
-          placeholder="Telegram (необязательно)"
-          value={telegram}
-          onChange={(e) => setTelegram(e.target.value)}
-          className="w-full border rounded-xl px-4 py-3 text-sm"
-        />
+            <input
+              className="h-12 rounded-xl border border-neutral-200 px-4 text-sm outline-none focus:border-neutral-400"
+              placeholder="Telegram (необязательно)"
+              value={form.telegram || ""}
+              onChange={(e) => setField("telegram", e.target.value)}
+              disabled={submitting}
+            />
 
-        <input
-          placeholder="Город"
-          value={city}
-          onChange={(e) => setCity(e.target.value)}
-          className="w-full border rounded-xl px-4 py-3 text-sm"
-        />
+            <input
+              className="h-12 rounded-xl border border-neutral-200 px-4 text-sm outline-none focus:border-neutral-400"
+              placeholder="Город"
+              value={form.city || ""}
+              onChange={(e) => setField("city", e.target.value)}
+              disabled={submitting}
+            />
 
-        <input
-          placeholder="Адрес"
-          value={address}
-          onChange={(e) => setAddress(e.target.value)}
-          className="w-full border rounded-xl px-4 py-3 text-sm"
-        />
+            <input
+              className="h-12 rounded-xl border border-neutral-200 px-4 text-sm outline-none focus:border-neutral-400"
+              placeholder="Адрес"
+              value={form.address || ""}
+              onChange={(e) => setField("address", e.target.value)}
+              disabled={submitting}
+            />
 
-        <textarea
-          placeholder="Комментарий к заказу"
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          className="w-full border rounded-xl px-4 py-3 text-sm"
-          rows={3}
-        />
-      </div>
+            <textarea
+              className="min-h-[120px] rounded-xl border border-neutral-200 px-4 py-3 text-sm outline-none focus:border-neutral-400"
+              placeholder="Комментарий к заказу"
+              value={form.comment || ""}
+              onChange={(e) => setField("comment", e.target.value)}
+              disabled={submitting}
+            />
 
-      {error && <div className="mt-4 text-sm text-red-600">{error}</div>}
+            {error ? (
+              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {error}
+              </div>
+            ) : null}
 
-      <button
-        type="button"
-        onClick={submit}
-        disabled={loading}
-        className="mt-6 w-full rounded-full bg-black text-white py-3 text-sm disabled:opacity-50"
-      >
-        {loading ? "Переход к оплате..." : "Перейти к оплате"}
-      </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="mt-2 h-12 rounded-full bg-black text-sm font-medium text-white disabled:opacity-60"
+            >
+              {submitting ? "Переходим к оплате..." : "Перейти к оплате"}
+            </button>
 
-      <p className="mt-4 text-xs opacity-60 text-center">
-        После оплаты вы будете перенаправлены на страницу подтверждения
-      </p>
-    </div>
+            <div className="text-center text-xs text-neutral-500">
+              {loadingMe
+                ? "Загружаем данные из личного кабинета…"
+                : "После оплаты вы будете перенаправлены на страницу подтверждения"}
+            </div>
+          </div>
+        </form>
+      )}
+    </main>
   );
 }

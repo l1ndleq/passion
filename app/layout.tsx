@@ -8,8 +8,7 @@ import CartButton from "@/components/CartButton";
 import CartLinkClientOnly from "@/components/CartLinkClientOnly";
 import { Inter, Cormorant_Garamond } from "next/font/google";
 import OrderTrackHeader from "@/components/OrderTrackHeader";
-
-
+import { CartProvider } from "@/components/cart/CartProvider";
 
 const inter = Inter({
   subsets: ["latin", "cyrillic"],
@@ -36,81 +35,78 @@ const NAV_LINK =
   "after:origin-left after:scale-x-0 after:bg-black/60 " +
   "after:transition-transform after:duration-300 hover:after:scale-x-100";
 
-
 // layout — Server Component
 const CURRENT_YEAR = new Date().getFullYear();
-
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ru" className={`${inter.variable} ${cormorant.variable}`}>
       <body>
         <AppProviders>
-        <div className="min-h-screen bg-[#fbf7f3] text-[#141414]">
-          <StickyHeader>
-            <header className="border-b border-black/10 bg-white/60 backdrop-blur">
-              <div className="mx-auto flex h-12 max-w-6xl items-center px-5">
-                {/* ЛЕВО — навигация */}
-                <nav className="flex shrink-0 items-center gap-8 text-[11px] uppercase tracking-[0.22em] text-black/60">
-                  <Link
-                    href="/"
-                    className="relative transition-colors hover:text-black
+          <div className="min-h-screen bg-[#fbf7f3] text-[#141414]">
+            <StickyHeader>
+              <header className="border-b border-black/10 bg-white/60 backdrop-blur">
+                <div className="mx-auto flex h-12 max-w-6xl items-center px-5">
+                  {/* ЛЕВО — навигация */}
+                  <nav className="flex shrink-0 items-center gap-8 text-[11px] uppercase tracking-[0.22em] text-black/60">
+                    <Link
+                      href="/"
+                      className="relative transition-colors hover:text-black
                                after:absolute after:left-0 after:-bottom-1 after:h-[1px] after:w-full
                                after:origin-left after:scale-x-0 after:bg-black/60
                                after:transition-transform after:duration-300 hover:after:scale-x-100"
-                  >
-                    Главная
-                  </Link>
+                    >
+                      Главная
+                    </Link>
 
-                  <Link
-                    href="/products"
-                    className="relative transition-colors hover:text-black
+                    <Link
+                      href="/products"
+                      className="relative transition-colors hover:text-black
                                after:absolute after:left-0 after:-bottom-1 after:h-[1px] after:w-full
                                after:origin-left after:scale-x-0 after:bg-black/60
                                after:transition-transform after:duration-300 hover:after:scale-x-100"
-                  >
-                    Каталог
-                  </Link>
+                    >
+                      Каталог
+                    </Link>
 
-             
-
-                  <Link
-                    href="/contact"
-                    className="relative transition-colors hover:text-black
+                    <Link
+                      href="/contact"
+                      className="relative transition-colors hover:text-black
                                after:absolute after:left-0 after:-bottom-1 after:h-[1px] after:w-full
                                after:origin-left after:scale-x-0 after:bg-black/60
                                after:transition-transform after:duration-300 hover:after:scale-x-100"
-                  >
-                    Контакты
-                  </Link>
-                   <CartLinkClientOnly className={NAV_LINK}/>
-                   <Link href="/account" className={NAV_LINK}>Кабинет</Link>
+                    >
+                      Контакты
+                    </Link>
 
+                    <CartLinkClientOnly className={NAV_LINK} />
+                    <Link href="/account" className={NAV_LINK}>
+                      Кабинет
+                    </Link>
+                  </nav>
 
-                </nav>
+                  {/* СПЕЙСЕР */}
+                  <div className="flex-1" />
 
-                {/* СПЕЙСЕР */}
-                <div className="flex-1" />
+                  {/* ПРАВО — поиск (вторая половина) */}
+                  <div className="hidden md:flex w-[560px] max-w-[50%]">
+                    <SearchBarClientOnly className="w-full" />
+                  </div>
 
-                {/* ПРАВО — поиск (вторая половина) */}
-                <div className="hidden md:flex w-[560px] max-w-[50%]">
-                  <SearchBarClientOnly className="w-full" />
+                  {/* mobile search icon */}
+                  <div className="md:hidden">
+                    <MobileSearchClientOnly />
+                  </div>
                 </div>
+              </header>
+            </StickyHeader>
 
-                {/* mobile search icon */}
-                <div className="md:hidden">
-                  <MobileSearchClientOnly />
-                </div>
-              </div>
-            </header>
-          </StickyHeader>
+            {children}
 
-          {children}
-
-          <footer className="mx-auto max-w-6xl px-5 py-10 text-xs uppercase tracking-[0.22em] text-black/45">
-            © {CURRENT_YEAR} passion
-          </footer>
-        </div>
+            <footer className="mx-auto max-w-6xl px-5 py-10 text-xs uppercase tracking-[0.22em] text-black/45">
+              © {CURRENT_YEAR} passion
+            </footer>
+          </div>
         </AppProviders>
       </body>
     </html>

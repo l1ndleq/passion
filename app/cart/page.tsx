@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useCart } from "../cart-context";
+import { useCart } from "@/components/cart/CartProvider";
 
 export default function CartPage() {
-  const { items, remove, setQty, totalPrice } = useCart();
+  const { items, removeItem, setQty, total } = useCart();
 
   if (!items.length) {
     return (
@@ -63,27 +63,28 @@ export default function CartPage() {
               <div className="flex gap-4">
                 {/* Image (если появится позже) */}
                 <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl border bg-neutral-50">
-  <Image
-    src={i.image || "/images/placeholder-product.jpg"}
-    alt={i.title}
-    fill
-    className="object-cover"
-    sizes="80px"
-  />
-</div>
-
+                  <Image
+                    src={i.image || "/images/placeholder-product.jpg"}
+                    alt={(i as any).title || (i as any).name || "Товар"}
+                    fill
+                    className="object-cover"
+                    sizes="80px"
+                  />
+                </div>
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <div className="font-semibold truncate">{i.title}</div>
+                      <div className="font-semibold truncate">
+                        {(i as any).title || (i as any).name}
+                      </div>
                       <div className="text-sm text-neutral-500">
                         {i.price} ₽ / шт
                       </div>
                     </div>
 
                     <button
-                      onClick={() => remove(i.id)}
+                      onClick={() => removeItem(i.id)}
                       className="text-sm text-neutral-600 underline hover:opacity-70"
                     >
                       Удалить
@@ -129,15 +130,13 @@ export default function CartPage() {
           <div className="rounded-3xl border bg-white/60 backdrop-blur p-5 shadow-sm">
             <div className="flex items-center justify-between">
               <div className="text-lg font-semibold">Итого</div>
-              <div className="text-sm text-neutral-500">
-                {items.length} поз.
-              </div>
+              <div className="text-sm text-neutral-500">{items.length} поз.</div>
             </div>
 
             <div className="mt-4 space-y-2 text-sm">
               <div className="flex justify-between">
                 <span>Товары</span>
-                <span className="tabular-nums">{totalPrice} ₽</span>
+                <span className="tabular-nums">{total} ₽</span>
               </div>
 
               <div className="flex justify-between text-neutral-500">
@@ -149,7 +148,7 @@ export default function CartPage() {
 
               <div className="flex justify-between text-base font-semibold">
                 <span>К оплате</span>
-                <span className="tabular-nums">{totalPrice} ₽</span>
+                <span className="tabular-nums">{total} ₽</span>
               </div>
             </div>
 

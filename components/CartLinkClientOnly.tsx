@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { useCart } from "@/app/cart-context";
+import { useCart } from "@/components/cart/CartProvider";
+
 
 type Props = {
   className?: string;
