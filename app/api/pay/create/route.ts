@@ -128,8 +128,6 @@ async function sendAdminTelegram({ text, orderUrl }: { text: string; orderUrl: s
 
   return okCount > 0;
 }
-
-
 /** ===== Telegram: User (PassionLoginBot) ===== */
 async function sendUserTelegram({
   chatId,
@@ -147,28 +145,24 @@ async function sendUserTelegram({
     ? { inline_keyboard: [[{ text: "Открыть заказ", url: orderUrl }]] }
     : undefined;
 
-  const r = await fetch("/api/pay/create", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({
-   customer: {
-  ...body.customer,
-  name,
-  phone,
-  telegram: telegram ? telegram : null,
-},
-
-
-    items: cartItems, // как у тебя уже есть
-    totalPrice: total, // ВАЖНО: backend ждёт totalPrice
-  }),
-});
+  const r = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      chat_id: chatId,
+      text,
+      parse_mode: "HTML",
+      disable_web_page_preview: true,
+      ...(keyboard ? { reply_markup: keyboard } : {}),
+    }),
+  });
 
   const j = await r.json().catch(() => null);
   if (!r.ok || !j?.ok) {
     console.error("User Telegram send failed:", { chatId, status: r.status, resp: j });
   }
 }
+
 
 function formatAdminOrderText(order: {
   orderId: string;
@@ -304,18 +298,19 @@ if (!adminAlready) {
 
     // ✅ Пользователю (если телефон привязан к TG)
     const userNotifyKey = `order:${orderId}:tg_user_created`;
-    const userAlready = await redis.get(userNotifyKey);
-    if (!userAlready) {
-      const chatId = await redis.get<number>(`tg:phone:${digits}`);
-      if (chatId) {
-        await sendUserTelegram({
-          chatId,
-          text: formatUserOrderText({ orderId, totalPrice }),
-          orderUrl: userOrderUrl,
-        });
-      }
-      await redis.set(userNotifyKey, 1, { ex: ORDER_TTL_SECONDS });
-    }
+const userAlready = await redis.get(userNotifyKey);
+
+if (!userAlready) {
+  const chatId = await redis.get<number>(`tg:phone:${digits}`);
+  if (chatId) {
+    await sendUserTelegram({
+      chatId,
+      text: formatUserOrderText({ orderId, totalPrice }),
+      orderUrl: userOrderUrl,
+    });
+    await redis.set(userNotifyKey, 1, { ex: ORDER_TTL_SECONDS });
+  }
+}
 
     const paymentUrl = `${siteUrl}/order/${orderId}`;
     return NextResponse.json({ ok: true, orderId, paymentUrl });
