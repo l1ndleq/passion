@@ -62,8 +62,8 @@ function isValidPhone(raw: string) {
   return digits.length >= 10 && digits.length <= 15;
 }
 
-/** ===== Telegram helpers (админ-уведомления) ===== */
-function getChatIds() {
+/** ===== Telegram helpers (АДМИН-уведомления через PassionOfferBot) ===== */
+function getAdminChatIds() {
   const raw = process.env.TELEGRAM_CHAT_IDS || "";
   return raw
     .split(",")
@@ -71,11 +71,21 @@ function getChatIds() {
     .filter(Boolean);
 }
 
-async function sendTelegram(text: string) {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
-  const chatIds = getChatIds();
+async function sendAdminTelegram({
+  text,
+  orderUrl,
+}: {
+  text: string;
+  orderUrl: string;
+}) {
+  const token = process.env.TELEGRAM_ADMIN_BOT_TOKEN; // ✅ ВАЖНО: админский бот
+  const chatIds = getAdminChatIds();
 
   if (!token || chatIds.length === 0) return;
+
+  const keyboard = orderUrl
+    ? { inline_keyboard: [[{ text: "Открыть заказ", url: orderUrl }]] }
+    : undefined;
 
   await Promise.all(
     chatIds.map(async (chat_id) => {
@@ -87,14 +97,23 @@ async function sendTelegram(text: string) {
           text,
           parse_mode: "HTML",
           disable_web_page_preview: true,
+          ...(keyboard ? { reply_markup: keyboard } : {}),
         }),
       });
+
       const j = await r.json().catch(() => null);
       if (!r.ok || !j?.ok) {
-        console.error("Telegram send failed:", { chat_id, status: r.status, resp: j });
+        console.error("Admin Telegram send failed:", { chat_id, status: r.status, resp: j });
       }
     })
   );
+}
+
+function escapeHtml(s: string) {
+  return String(s ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
 }
 
 function formatMoney(n: number) {
@@ -116,15 +135,15 @@ function formatOrderText(order: {
   const c = order.customer ?? {};
   const statusLine = order.status === "paid" ? "Оплачено ✅" : "Не оплачено ⏳";
 
-  const name = String(c.name ?? "").trim() || "—";
-  const phone = String(c.phone ?? "").trim() || "—";
+  const name = escapeHtml(String(c.name ?? "").trim() || "—");
+  const phone = escapeHtml(String(c.phone ?? "").trim() || "—");
   const tg = String(c.telegram ?? "").trim();
-  const city = String(c.city ?? "").trim();
-  const address = String(c.address ?? "").trim();
-  const message = String(c.message ?? "").trim();
+  const city = escapeHtml(String(c.city ?? "").trim());
+  const address = escapeHtml(String(c.address ?? "").trim());
+  const message = escapeHtml(String(c.message ?? "").trim());
 
   const lines: string[] = [];
-  lines.push(`<b>🧾 Заявка на заказ</b>`);
+  lines.push(`🧾 <b>Новый заказ</b>`);
   lines.push(`<b>Статус:</b> ${statusLine}`);
   lines.push(`<b>Заказ:</b> <code>${order.orderId}</code>`);
   lines.push(`<b>Сумма:</b> ${formatMoney(order.totalPrice)} ₽`);
@@ -132,7 +151,7 @@ function formatOrderText(order: {
 
   lines.push(`<b>Имя:</b> ${name}`);
   lines.push(`<b>Телефон:</b> ${phone}`);
-  lines.push(`<b>Telegram:</b> ${tg ? `@${tg.replace(/^@/, "")}` : "—"}`);
+  lines.push(`<b>Telegram:</b> ${tg ? `@${escapeHtml(tg.replace(/^@/, ""))}` : "—"}`);
 
   if (city) lines.push(`<b>Город:</b> ${city}`);
   if (address) lines.push(`<b>Адрес:</b> ${address}`);
@@ -141,7 +160,7 @@ function formatOrderText(order: {
   lines.push("");
   lines.push(`<b>Товары:</b>`);
   for (const it of order.items || []) {
-    const title = String(it.title ?? it.id ?? "Товар");
+    const title = escapeHtml(String(it.title ?? it.id ?? "Товар"));
     const qty = Number(it.qty ?? 1);
     const price = Number(it.price ?? 0);
     lines.push(`• ${title} × ${qty} — ${formatMoney(price * qty)} ₽`);
@@ -185,10 +204,14 @@ export async function POST(req: Request) {
       orderId,
       status: "pending_payment" as const,
       createdAt: Date.now(),
+      updatedAt: Date.now(),
+      statusHistory: [
+        { status: "pending_payment", at: Date.now(), by: "system" as const },
+      ],
       customer: {
         ...customer,
         name,
-        phone, // ✅ канонический +7
+        phone,
         telegram: telegram ? telegram : null,
       },
       items,
@@ -197,32 +220,36 @@ export async function POST(req: Request) {
 
     const redis = getRedisOrThrow();
 
-    // 1) сам заказ
+    // 1) заказ
     await redis.set(`order:${orderId}`, order, { ex: ORDER_TTL_SECONDS });
 
     // 2) индекс для админки
     await redis.lpush("orders:latest", orderId);
     await redis.ltrim("orders:latest", 0, 199);
 
-    // ✅ 3) индекс для ЛК по пользователю (ВАЖНО)
+    // 3) индекс для ЛК по пользователю
     await redis.lpush(`user:orders:${digits}`, orderId);
     await redis.ltrim(`user:orders:${digits}`, 0, 199);
+
+    const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/+$/, "");
+    const orderUrl = `${siteUrl}/admin/orders/${orderId}`;
 
     // антидубль телеги
     const notifyKey = `order:${orderId}:tg_created`;
     const alreadyNotified = await redis.get(notifyKey);
     if (!alreadyNotified) {
-      await sendTelegram(formatOrderText(order));
+      await sendAdminTelegram({
+        text: formatOrderText(order),
+        orderUrl,
+      });
       await redis.set(notifyKey, 1, { ex: ORDER_TTL_SECONDS });
     }
 
-    const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/+$/, "");
     const paymentUrl = `${siteUrl}/order/${orderId}`;
-
     return NextResponse.json({ ok: true, orderId, paymentUrl });
   } catch (e: any) {
     const message = e?.message || "PAY_CREATE_FAILED";
-    console.error("PAY CREATE ERROR:", message);
+    console.error("PAY CREATE ERROR:", message, e);
     return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }
 }
