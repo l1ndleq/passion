@@ -25,12 +25,27 @@ function statusText(status: string) {
   return status;
 }
 
-async function sendTelegramToChat(chatId: number, text: string) {
-  // ✅ СЛАЕМ ИМЕННО В PassionLoginBot
-  const token = process.env.PASSION_LOGIN_BOT_TOKEN;
+function pickBotToken() {
+  // ✅ главный — тот же, что использует OTP (PassionLoginBot)
+  const t1 = process.env.TELEGRAM_BOT_TOKEN;
+  // ✅ запасной — если ты добавлял отдельный env
+  const t2 = process.env.PASSION_LOGIN_BOT_TOKEN;
+  return {
+    token: t1 || t2 || "",
+    source: t1 ? "TELEGRAM_BOT_TOKEN" : t2 ? "PASSION_LOGIN_BOT_TOKEN" : "MISSING",
+  };
+}
+
+async function sendTelegram(chatId: number, text: string) {
+  const { token, source } = pickBotToken();
+
   if (!token) {
-    console.error("PASSION_LOGIN_BOT_TOKEN missing on Vercel");
-    return;
+    return {
+      ok: false,
+      source,
+      httpStatus: 0,
+      body: { error: "BOT_TOKEN_MISSING" },
+    };
   }
 
   const r = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
@@ -45,19 +60,27 @@ async function sendTelegramToChat(chatId: number, text: string) {
   });
 
   const j = await r.json().catch(() => null);
-  if (!r.ok || !j?.ok) {
-    console.error("TG notify failed:", { chatId, status: r.status, resp: j });
-  }
+
+  return {
+    ok: r.ok && Boolean(j?.ok),
+    source,
+    httpStatus: r.status,
+    body: j,
+  };
 }
 
 type Body = { orderId?: string; status?: string };
 
 export async function POST(req: Request) {
   try {
+    // ✅ защита
     const adminSecret = process.env.ADMIN_SECRET || "";
     const got = req.headers.get("x-admin-secret") || "";
     if (!adminSecret || got !== adminSecret) {
-      return NextResponse.json({ ok: false, error: "FORBIDDEN" }, { status: 403 });
+      return NextResponse.json(
+        { ok: false, error: "FORBIDDEN", debug: { hasAdminSecret: Boolean(adminSecret) } },
+        { status: 403 }
+      );
     }
 
     const body = (await req.json().catch(() => ({}))) as Body;
@@ -68,38 +91,55 @@ export async function POST(req: Request) {
     if (!status) return NextResponse.json({ ok: false, error: "STATUS_REQUIRED" }, { status: 400 });
 
     const redis = getRedis();
+    const orderKey = `order:${orderId}`;
+    const order: any = await redis.get(orderKey);
 
-    const key = `order:${orderId}`;
-    const order: any = await redis.get(key);
-    if (!order) return NextResponse.json({ ok: false, error: "ORDER_NOT_FOUND" }, { status: 404 });
-
-    const prevStatus = String(order.status || "");
-    if (prevStatus === status) return NextResponse.json({ ok: true, changed: false });
-
-    const next = { ...order, status };
-    await redis.set(key, next); // без TTL, чтобы не исчезало
-
-    // ✅ найти chatId по телефону заказа
-    const phone = String(order?.customer?.phone || "");
-    const digits = phoneDigits(phone);
-    const chatId = await redis.get<number>(`tg:phone:${digits}`);
-
-    if (chatId) {
-      const site = (process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/+$/, "");
-      const msg =
-        `<b>Статус заказа обновлён</b>\n` +
-        `<b>Заказ:</b> <code>${orderId}</code>\n` +
-        `<b>Статус:</b> ${statusText(status)}\n` +
-        (site ? `\nОткрыть заказ: ${site}/order/${orderId}` : "");
-
-      await sendTelegramToChat(chatId, msg);
-    } else {
-      console.warn("No chatId for phone digits:", digits);
+    if (!order) {
+      return NextResponse.json({ ok: false, error: "ORDER_NOT_FOUND" }, { status: 404 });
     }
 
-    return NextResponse.json({ ok: true, changed: true });
+    const prevStatus = String(order.status || "");
+    const next = { ...order, status };
+
+    // ✅ сохраняем (без TTL — чтобы заказ не исчезал)
+    await redis.set(orderKey, next);
+
+    const phone = String(order?.customer?.phone || "");
+    const digits = phoneDigits(phone);
+
+    // ⚠️ ВАЖНО: у тебя chatId хранится по digits: tg:phone:<digits>
+    const chatId = await redis.get<number>(`tg:phone:${digits}`);
+
+    const site = (process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/+$/, "");
+    const msg =
+      `<b>Статус заказа обновлён</b>\n` +
+      `<b>Заказ:</b> <code>${orderId}</code>\n` +
+      `<b>Статус:</b> ${statusText(status)}\n` +
+      (site ? `\nОткрыть заказ: ${site}/order/${orderId}` : "");
+
+    let tg = null as any;
+    if (chatId) {
+      tg = await sendTelegram(chatId, msg);
+    }
+
+    return NextResponse.json({
+      ok: true,
+      changed: prevStatus !== status,
+      debug: {
+        prevStatus,
+        status,
+        phone,
+        digits,
+        chatId: chatId ?? null,
+        tokenSource: pickBotToken().source,
+        telegram: tg,
+      },
+    });
   } catch (e: any) {
     console.error("ORDER STATUS ERROR:", e?.message);
-    return NextResponse.json({ ok: false, error: "STATUS_UPDATE_FAILED" }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, error: "STATUS_UPDATE_FAILED", debug: { message: e?.message } },
+      { status: 500 }
+    );
   }
 }
