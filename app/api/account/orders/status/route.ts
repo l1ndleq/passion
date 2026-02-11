@@ -25,6 +25,11 @@ function statusText(status: string) {
   return status;
 }
 
+function getAdminChatIds() {
+  const raw = process.env.TELEGRAM_CHAT_IDS || "";
+  return raw.split(",").map((s) => s.trim()).filter(Boolean);
+}
+
 async function tgSend(token: string, chatId: number | string, text: string) {
   const r = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
     method: "POST",
@@ -36,74 +41,104 @@ async function tgSend(token: string, chatId: number | string, text: string) {
       disable_web_page_preview: true,
     }),
   });
+
   const j = await r.json().catch(() => null);
   return { ok: r.ok && Boolean(j?.ok), httpStatus: r.status, body: j };
 }
 
-function getAdminChatIds() {
-  const raw = process.env.TELEGRAM_CHAT_IDS || "";
-  return raw.split(",").map(s => s.trim()).filter(Boolean);
-}
-
 type Body = { orderId?: string; status?: string };
 
-// ✅ GET debug как у тебя
+// ✅ GET: можно тестить прямо в браузере
+// Пример:
+// /api/account/orders/status?orderId=P-XXX&status=shipped&secret=ADMIN_SECRET&sendUser=1&sendAdmin=1
 export async function GET(req: Request) {
-  const url = new URL(req.url);
-  const orderId = String(url.searchParams.get("orderId") || "").trim();
-  const status = String(url.searchParams.get("status") || "shipped").trim();
-  const send = url.searchParams.get("send") === "1";
-  const secret = String(url.searchParams.get("secret") || "");
+  try {
+    const u = new URL(req.url);
+    const orderId = String(u.searchParams.get("orderId") || "").trim();
+    const status = String(u.searchParams.get("status") || "shipped").trim();
+    const secret = String(u.searchParams.get("secret") || "").trim();
+    const sendUser = u.searchParams.get("sendUser") === "1";
+    const sendAdmin = u.searchParams.get("sendAdmin") === "1";
 
-  const adminSecret = process.env.ADMIN_SECRET || "";
-  if (!adminSecret || secret !== adminSecret) {
-    return NextResponse.json({ ok: false, error: "FORBIDDEN" }, { status: 403 });
-  }
-  if (!orderId) {
-    return NextResponse.json({ ok: false, error: "ORDER_ID_REQUIRED" }, { status: 400 });
-  }
+    const adminSecret = process.env.ADMIN_SECRET || "";
+    if (!adminSecret || secret !== adminSecret) {
+      return NextResponse.json({ ok: false, error: "FORBIDDEN" }, { status: 403 });
+    }
 
-  const redis = getRedis();
-  const order: any = await redis.get(`order:${orderId}`);
-  if (!order) return NextResponse.json({ ok: false, error: "ORDER_NOT_FOUND" }, { status: 404 });
+    if (!orderId) {
+      return NextResponse.json(
+        { ok: false, error: "ORDER_ID_REQUIRED" },
+        { status: 400 }
+      );
+    }
 
-  const phone = String(order?.customer?.phone || "");
-  const digits = phoneDigits(phone);
-  const chatId = await redis.get<number>(`tg:phone:${digits}`);
+    const redis = getRedis();
+    const order: any = await redis.get(`order:${orderId}`);
+    if (!order) return NextResponse.json({ ok: false, error: "ORDER_NOT_FOUND" }, { status: 404 });
 
-  const loginToken = process.env.TELEGRAM_LOGIN_BOT_TOKEN || "";
-  const adminToken = process.env.TELEGRAM_ADMIN_BOT_TOKEN || "";
+    const loginToken = process.env.TELEGRAM_LOGIN_BOT_TOKEN || "";
+    const adminToken = process.env.TELEGRAM_ADMIN_BOT_TOKEN || "";
+    const adminChatIds = getAdminChatIds();
 
-  let telegramUser: any = null;
-  if (send && chatId) {
+    const phone = String(order?.customer?.phone || "");
+    const digits = phoneDigits(phone);
+    const chatId = await redis.get<number>(`tg:phone:${digits}`);
+
     const site = (process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/+$/, "");
-    const msg =
-      `<b>Тест уведомления</b>\n` +
+    const userMsg =
+      `<b>Тест уведомления (user)</b>\n` +
       `<b>Заказ:</b> <code>${orderId}</code>\n` +
       `<b>Статус:</b> ${statusText(status)}\n` +
-      (site ? `\nОткрыть заказ: ${site}/order/${orderId}` : "");
+      (site ? `\nОткрыть: ${site}/order/${orderId}` : "");
 
-    telegramUser = loginToken
-      ? await tgSend(loginToken, chatId, msg)
-      : { ok: false, error: "TELEGRAM_LOGIN_BOT_TOKEN missing" };
+    const adminMsg =
+      `<b>Тест уведомления (admin)</b>\n` +
+      `<b>Заказ:</b> <code>${orderId}</code>\n` +
+      `<b>Статус:</b> ${statusText(status)}\n` +
+      `<b>Телефон:</b> ${phone || "—"}`;
+
+    let telegramUser: any = null;
+    if (sendUser) {
+      if (!loginToken) telegramUser = { ok: false, error: "TELEGRAM_LOGIN_BOT_TOKEN missing" };
+      else if (!chatId) telegramUser = { ok: false, error: "chatId not found for phone digits", digits };
+      else telegramUser = await tgSend(loginToken, chatId, userMsg);
+    }
+
+    let telegramAdmin: any = null;
+    if (sendAdmin) {
+      if (!adminToken) telegramAdmin = { ok: false, error: "TELEGRAM_ADMIN_BOT_TOKEN missing" };
+      else if (adminChatIds.length === 0) telegramAdmin = { ok: false, error: "TELEGRAM_CHAT_IDS empty" };
+      else telegramAdmin = await Promise.all(adminChatIds.map((cid) => tgSend(adminToken, cid, adminMsg)));
+    }
+
+    return NextResponse.json({
+      ok: true,
+      debug: {
+        orderId,
+        status,
+        phone,
+        digits,
+        chatId: chatId ?? null,
+        env: {
+          hasLoginToken: Boolean(loginToken),
+          hasAdminToken: Boolean(adminToken),
+          adminChatIds,
+        },
+        sendUser,
+        sendAdmin,
+        telegramUser,
+        telegramAdmin,
+      },
+    });
+  } catch (e: any) {
+    return NextResponse.json(
+      { ok: false, error: "DEBUG_FAILED", message: e?.message },
+      { status: 500 }
+    );
   }
-
-  return NextResponse.json({
-    ok: true,
-    debug: {
-      orderId,
-      phone,
-      digits,
-      chatId: chatId ?? null,
-      hasLoginToken: Boolean(loginToken),
-      hasAdminToken: Boolean(adminToken),
-      sentAttempted: send,
-      telegramUser,
-    },
-  });
 }
 
-// ✅ POST: реальная смена статуса + уведомление пользователю (LoginBot)
+// ✅ POST: реальная смена статуса + уведомления (если всё настроено)
 export async function POST(req: Request) {
   try {
     const adminSecret = process.env.ADMIN_SECRET || "";
@@ -115,6 +150,7 @@ export async function POST(req: Request) {
     const body = (await req.json().catch(() => ({}))) as Body;
     const orderId = String(body.orderId || "").trim();
     const status = String(body.status || "").trim();
+
     if (!orderId) return NextResponse.json({ ok: false, error: "ORDER_ID_REQUIRED" }, { status: 400 });
     if (!status) return NextResponse.json({ ok: false, error: "STATUS_REQUIRED" }, { status: 400 });
 
@@ -129,34 +165,33 @@ export async function POST(req: Request) {
 
     const loginToken = process.env.TELEGRAM_LOGIN_BOT_TOKEN || "";
     const adminToken = process.env.TELEGRAM_ADMIN_BOT_TOKEN || "";
+    const adminChatIds = getAdminChatIds();
 
-    // 1) ✅ Пользовательское уведомление (LoginBot)
     const phone = String(order?.customer?.phone || "");
     const digits = phoneDigits(phone);
     const chatId = await redis.get<number>(`tg:phone:${digits}`);
 
+    const site = (process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/+$/, "");
+    const userMsg =
+      `<b>Статус заказа обновлён</b>\n` +
+      `<b>Заказ:</b> <code>${orderId}</code>\n` +
+      `<b>Статус:</b> ${statusText(status)}\n` +
+      (site ? `\nОткрыть: ${site}/order/${orderId}` : "");
+
+    const adminMsg =
+      `<b>Админ: статус изменён</b>\n` +
+      `<b>Заказ:</b> <code>${orderId}</code>\n` +
+      `<b>${prevStatus}</b> → <b>${status}</b>\n` +
+      `<b>Телефон:</b> ${phone || "—"}`;
+
     let telegramUser: any = null;
     if (chatId && loginToken) {
-      const site = (process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/+$/, "");
-      const msg =
-        `<b>Статус заказа обновлён</b>\n` +
-        `<b>Заказ:</b> <code>${orderId}</code>\n` +
-        `<b>Статус:</b> ${statusText(status)}\n` +
-        (site ? `\nОткрыть заказ: ${site}/order/${orderId}` : "");
-      telegramUser = await tgSend(loginToken, chatId, msg);
+      telegramUser = await tgSend(loginToken, chatId, userMsg);
     }
 
-    // 2) ✅ Админское уведомление (OfferBot) — по желанию
-    // Если хочешь включить — просто оставь как есть, оно отправит в TELEGRAM_CHAT_IDS.
     let telegramAdmin: any = null;
-    const adminChatIds = getAdminChatIds();
     if (adminToken && adminChatIds.length) {
-      const msg =
-        `<b>Админ: статус изменён</b>\n` +
-        `<b>Заказ:</b> <code>${orderId}</code>\n` +
-        `<b>${prevStatus}</b> → <b>${status}</b>\n` +
-        `<b>Телефон:</b> ${phone || "—"}`;
-      telegramAdmin = await Promise.all(adminChatIds.map((cid) => tgSend(adminToken, cid, msg)));
+      telegramAdmin = await Promise.all(adminChatIds.map((cid) => tgSend(adminToken, cid, adminMsg)));
     }
 
     return NextResponse.json({
@@ -166,12 +201,16 @@ export async function POST(req: Request) {
         phone,
         digits,
         chatId: chatId ?? null,
+        env: {
+          hasLoginToken: Boolean(loginToken),
+          hasAdminToken: Boolean(adminToken),
+          adminChatIds,
+        },
         telegramUser,
         telegramAdmin,
       },
     });
   } catch (e: any) {
-    console.error("STATUS_UPDATE_FAILED:", e?.message);
-    return NextResponse.json({ ok: false, error: "STATUS_UPDATE_FAILED" }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "STATUS_UPDATE_FAILED", message: e?.message }, { status: 500 });
   }
 }
