@@ -56,12 +56,12 @@ export function ProductCard({
 
         {/* CONTENT */}
         <div className="pt-3">
-          <h3 className="line-clamp-2 text-[13px] font-medium leading-snug text-black sm:text-sm">
+          <h3 className="line-clamp-2 text-[13px] font-medium leading-snug text-black sm:text-sm md:text-base">
             {title}
           </h3>
 
           {typeof price === "number" && (
-            <div className="mt-1 text-[13px] font-semibold text-black sm:text-sm">
+            <div className="mt-1 text-[13px] font-semibold text-black sm:text-sm md:text-base">
               {price.toLocaleString("ru-RU")} ₽
             </div>
           )}
