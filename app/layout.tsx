@@ -8,6 +8,8 @@ import MobileSearchClientOnly from "@/components/MobileSearchClientOnly";
 import MobileMenu from "@/components/MobileMenu";
 import CartLinkClientOnly from "@/components/CartLinkClientOnly";
 import { Inter, Cormorant_Garamond } from "next/font/google";
+import MiniCartDrawer from "@/components/MiniCartDrawer";
+
 
 const inter = Inter({
   subsets: ["latin", "cyrillic"],
@@ -103,6 +105,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 </div>
               </header>
             </StickyHeader>
+            <MiniCartDrawer />
 
             {children}
 

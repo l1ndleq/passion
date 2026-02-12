@@ -17,14 +17,13 @@ export default function AddToCartButton({
   product: ProductMini;
   className?: string;
 }) {
-  const { items, addItem, removeItem, setQty } = useCart();
+  const { items, addItem, removeItem, setQty, notifyAdded } = useCart();
 
   const current = items.find((i) => i.id === product.id);
   const qty = current?.qty ?? 0;
 
   const inc = () => {
     if (qty === 0) {
-      // addItem принимает item без qty
       addItem(
         {
           id: product.id,
@@ -34,6 +33,7 @@ export default function AddToCartButton({
         },
         1
       );
+      notifyAdded(product.id); // ✅ премиум: открываем мини-корзину
     } else {
       setQty(product.id, qty + 1);
     }
@@ -47,7 +47,7 @@ export default function AddToCartButton({
     setQty(product.id, qty - 1);
   };
 
-  // ✅ 1) нет в корзине -> кнопка "В корзину" (в твоей стилистике)
+  // нет в корзине
   if (qty === 0) {
     return (
       <button
@@ -65,7 +65,7 @@ export default function AddToCartButton({
     );
   }
 
-  // ✅ 2) есть в корзине -> степпер - qty +
+  // есть в корзине -> stepper (+ микро “active”)
   return (
     <div
       className={[
@@ -78,7 +78,7 @@ export default function AddToCartButton({
       <button
         type="button"
         onClick={dec}
-        className="grid h-10 w-10 place-items-center hover:bg-black/[0.04] transition"
+        className="grid h-10 w-10 place-items-center hover:bg-black/[0.04] transition active:scale-90"
         aria-label="Уменьшить количество"
       >
         <span className="text-[18px] leading-none text-black/80">−</span>
@@ -91,7 +91,7 @@ export default function AddToCartButton({
       <button
         type="button"
         onClick={inc}
-        className="grid h-10 w-10 place-items-center hover:bg-black/[0.04] transition"
+        className="grid h-10 w-10 place-items-center hover:bg-black/[0.04] transition active:scale-90"
         aria-label="Увеличить количество"
       >
         <span className="text-[18px] leading-none text-black/80">+</span>

@@ -14,10 +14,18 @@ type CartContextValue = {
   items: CartItem[];
   total: number;
   count: number;
+
   addItem: (item: Omit<CartItem, "qty">, qty?: number) => void;
   removeItem: (id: string) => void;
   setQty: (id: string, qty: number) => void;
   clearCart: () => void;
+
+  // ✅ mini-cart drawer
+  drawerOpen: boolean;
+  openDrawer: () => void;
+  closeDrawer: () => void;
+  lastAddedId: string | null;
+  notifyAdded: (id: string) => void;
 };
 
 const CartContext = createContext<CartContextValue | null>(null);
@@ -26,6 +34,10 @@ const LS_KEY = "passion_cart_v1";
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
+
+  // drawer state
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [lastAddedId, setLastAddedId] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -74,9 +86,31 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const total = useMemo(() => items.reduce((s, x) => s + x.price * x.qty, 0), [items]);
   const count = useMemo(() => items.reduce((s, x) => s + x.qty, 0), [items]);
 
+  const openDrawer = () => setDrawerOpen(true);
+  const closeDrawer = () => setDrawerOpen(false);
+
+  const notifyAdded = (id: string) => {
+    setLastAddedId(id);
+    setDrawerOpen(true);
+  };
+
   const value: CartContextValue = useMemo(
-    () => ({ items, total, count, addItem, removeItem, setQty, clearCart }),
-    [items, total, count]
+    () => ({
+      items,
+      total,
+      count,
+      addItem,
+      removeItem,
+      setQty,
+      clearCart,
+
+      drawerOpen,
+      openDrawer,
+      closeDrawer,
+      lastAddedId,
+      notifyAdded,
+    }),
+    [items, total, count, drawerOpen, lastAddedId]
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
