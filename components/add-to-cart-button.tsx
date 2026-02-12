@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import * as React from "react";
 import { useCart } from "@/components/cart/CartProvider";
 
-type ProductLite = {
+type ProductMini = {
   id: string;
-  title?: string;
-  name?: string;
+  title: string;
   price: number;
   image?: string;
 };
@@ -15,114 +14,91 @@ export default function AddToCartButton({
   product,
   className = "",
 }: {
-  product: ProductLite;
+  product: ProductMini;
   className?: string;
 }) {
-  const { addItem } = useCart();
+  const cart = useCart() as any;
+  const items = cart?.items ?? [];
+  const add = cart?.add;
+  const setQty = cart?.setQty;
+  const remove = cart?.remove;
 
-  const label = useMemo(
-    () => product.title || product.name || "Товар",
-    [product.title, product.name]
-  );
+  const current = Array.isArray(items) ? items.find((i: any) => i?.id === product.id) : null;
+  const qty = Number(current?.qty || 0);
 
-  const [added, setAdded] = useState(false);
+  const inc = () => {
+    if (typeof add === "function") {
+      add({
+        id: product.id,
+        title: product.title,
+        price: product.price,
+        qty: 1,
+        image: product.image,
+      });
+      return;
+    }
+    if (typeof setQty === "function") setQty(product.id, qty + 1);
+  };
 
-  useEffect(() => {
-    if (!added) return;
-    const t = setTimeout(() => setAdded(false), 700);
-    return () => clearTimeout(t);
-  }, [added]);
+  const dec = () => {
+    if (qty <= 1) {
+      if (typeof remove === "function") remove(product.id);
+      else if (typeof setQty === "function") setQty(product.id, 0);
+      return;
+    }
+    if (typeof setQty === "function") setQty(product.id, qty - 1);
+  };
 
-  return (
-    <button
-      type="button"
-      onClick={() => {
-        addItem(
-          {
-            id: product.id,
-            name: label,
-            price: product.price,
-            image: product.image,
-          },
-          1
-        );
-        setAdded(true);
-      }}
-      className={[
-        "relative h-11 rounded-full px-5 text-sm font-medium transition",
-        "active:scale-[0.98] focus:outline-none",
-        // базовое состояние
-        !added
-          ? "bg-black text-white hover:bg-black/90"
-          : // ✅ success состояние (зелёное)
-            "bg-emerald-500 text-white shadow-[0_10px_30px_rgba(16,185,129,0.25)]",
-        // pop анимация
-        added ? "animate-[passion-pop_700ms_ease-out]" : "",
-        className,
-      ].join(" ")}
-      aria-label="Добавить в корзину"
-    >
-      {/* ✅ shine */}
-      <span
-        aria-hidden
+  // --- 1) НЕТ В КОРЗИНЕ -> обычная кнопка
+  if (!qty) {
+    return (
+      <button
+        type="button"
+        onClick={inc}
         className={[
-          "pointer-events-none absolute inset-0 overflow-hidden rounded-full",
-          added ? "opacity-100" : "opacity-0",
-          "transition-opacity duration-200",
+          "inline-flex items-center justify-center",
+          "h-10 rounded-2xl px-4",
+          "bg-black text-white text-[12px] uppercase tracking-[0.22em]",
+          "hover:opacity-90 transition",
+          className,
         ].join(" ")}
       >
-        <span className="absolute -left-1/2 top-0 h-full w-1/2 rotate-12 bg-white/35 blur-sm animate-[passion-shine_700ms_ease-out]" />
-      </span>
+        В корзину
+      </button>
+    );
+  }
 
-      <span className="relative flex items-center justify-center gap-2">
-        {added ? (
-          <>
-            <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-white/20">
-              {/* чек */}
-              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none">
-                <path
-                  d="M20 6L9 17l-5-5"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </span>
-            <span>Добавлено</span>
-          </>
-        ) : (
-          <span>В корзину</span>
-        )}
-      </span>
+  // --- 2) ЕСТЬ В КОРЗИНЕ -> stepper - qty +
+  return (
+    <div
+      className={[
+        "inline-flex items-center",
+        "h-10 rounded-2xl border border-black/10 bg-white",
+        "overflow-hidden",
+        className,
+      ].join(" ")}
+    >
+      <button
+        type="button"
+        onClick={dec}
+        className="h-10 w-10 grid place-items-center hover:bg-black/5 transition"
+        aria-label="Уменьшить количество"
+      >
+        <span className="text-[18px] leading-none">−</span>
+      </button>
 
-      {/* ✅ локальные keyframes, чтобы не трогать tailwind.config */}
-      <style jsx>{`
-        @keyframes passion-pop {
-          0% {
-            transform: scale(1);
-          }
-          30% {
-            transform: scale(1.04);
-          }
-          100% {
-            transform: scale(1);
-          }
-        }
-        @keyframes passion-shine {
-          0% {
-            transform: translateX(0) rotate(12deg);
-            opacity: 0;
-          }
-          15% {
-            opacity: 1;
-          }
-          100% {
-            transform: translateX(260%) rotate(12deg);
-            opacity: 0;
-          }
-        }
-      `}</style>
-    </button>
+      <div className="min-w-[38px] px-2 text-center text-[12px] font-medium tabular-nums">
+        {qty}
+      </div>
+
+      <button
+        type="button"
+        onClick={inc}
+        className="h-10 w-10 grid place-items-center hover:bg-black/5 transition"
+        aria-label="Увеличить количество"
+      >
+        <span className="text-[18px] leading-none">+</span>
+      </button>
+    </div>
   );
 }
