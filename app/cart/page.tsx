@@ -21,12 +21,13 @@ export default function CartPage() {
           </p>
 
           <div className="mt-6">
-            <Link
-              href="/"
-              className="inline-flex rounded-2xl bg-black px-6 py-3 text-white hover:opacity-90"
-            >
-              Перейти к товарам
-            </Link>
+         <Link
+  href="/products"
+  className="inline-flex rounded-2xl bg-black px-6 py-3 text-white hover:opacity-90"
+>
+  Перейти к товарам
+</Link>
+
           </div>
         </div>
       </main>

@@ -64,9 +64,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                       Контакты
                     </Link>
                     <CartLinkClientOnly className={NAV_LINK} variant="text" />
-                    <Link href="/account" className={NAV_LINK}>
-                      Кабинет
-                    </Link>
+                    <Link href="/account" className={NAV_LINK} aria-label="Кабинет">
+  <span className="inline-block">Кабинет</span>
+</Link>
+
                   </nav>
 
                   {/* CENTER LOGO (image) */}
