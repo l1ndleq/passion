@@ -76,7 +76,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                     <Link href="/" aria-label="На главную" className="inline-flex min-h-[44px] items-center">
                       {/* если у тебя лого не /logo.png — поменяй путь */}
                       <Image
-                        src="/logo.png"
+  src="/brand/logo.png"
+
                         alt="Passion"
                         width={110}
                         height={22}
