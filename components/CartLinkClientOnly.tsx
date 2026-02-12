@@ -1,21 +1,23 @@
 "use client";
 
 import Link from "next/link";
+import { useCart } from "@/components/cart/CartProvider";
 
 type Props = {
   className?: string;
   variant?: "text" | "icon";
 };
 
-export default function CartLinkClientOnly({
-  className = "",
-  variant = "text",
-}: Props) {
-  const { items } = useCart();
+export default function CartLinkClientOnly({ className = "", variant = "text" }: Props) {
+  const cart = useCart();
 
-  const count = items.reduce((sum, i) => sum + i.qty, 0);
+  // защищаемся от любых форм/undefined
+  const items = (cart as any)?.items ?? [];
+  const count = Array.isArray(items)
+    ? items.reduce((sum: number, i: any) => sum + (Number(i?.qty) || 0), 0)
+    : 0;
 
-  // 🖥 DESKTOP — текстовая версия
+  // 🖥 DESKTOP — текстовая версия + бейдж
   if (variant === "text") {
     return (
       <Link href="/cart" className={className}>
@@ -29,11 +31,17 @@ export default function CartLinkClientOnly({
     );
   }
 
-  // 📱 MOBILE — иконка
+  // 📱 MOBILE — иконка (кликабельная зона 44x44) + бейдж
   return (
     <Link
       href="/cart"
-      className="relative inline-flex h-9 w-9 items-center justify-center rounded-full border border-black/10 bg-white hover:bg-black/5 transition"
+      aria-label={`Корзина: ${count}`}
+      className={[
+        "relative inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full",
+        "border border-black/10 bg-white/60 backdrop-blur",
+        "hover:bg-black/[0.04] transition",
+        className,
+      ].join(" ")}
     >
       {/* SVG корзины */}
       <svg
@@ -41,10 +49,12 @@ export default function CartLinkClientOnly({
         height="18"
         viewBox="0 0 24 24"
         fill="none"
+        className="text-black/75"
         stroke="currentColor"
         strokeWidth="1.5"
         strokeLinecap="round"
         strokeLinejoin="round"
+        aria-hidden="true"
       >
         <circle cx="9" cy="21" r="1" />
         <circle cx="20" cy="21" r="1" />
@@ -52,7 +62,7 @@ export default function CartLinkClientOnly({
       </svg>
 
       {count > 0 && (
-        <span className="absolute -top-1 -right-1 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-black text-[9px] text-white font-medium px-1">
+        <span className="absolute -top-1 -right-1 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-black px-1 text-[9px] font-medium text-white">
           {count}
         </span>
       )}

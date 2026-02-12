@@ -8,6 +8,8 @@ import MobileSearchClientOnly from "@/components/MobileSearchClientOnly";
 import MobileMenu from "@/components/MobileMenu";
 import CartLinkClientOnly from "@/components/CartLinkClientOnly";
 import { Inter, Cormorant_Garamond } from "next/font/google";
+import CartButtonClientOnly from "@/components/CartButtonClientOnly";
+
 
 const inter = Inter({
   subsets: ["latin", "cyrillic"],
@@ -61,7 +63,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                     <Link href="/contact" className={NAV_LINK}>
                       Контакты
                     </Link>
-                    <CartLinkClientOnly className={NAV_LINK} />
+                    <CartLinkClientOnly className={NAV_LINK} variant="text" />
                     <Link href="/account" className={NAV_LINK}>
                       Кабинет
                     </Link>
@@ -95,9 +97,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
                   {/* MOBILE RIGHT */}
                   <div className="md:hidden ml-auto flex items-center gap-1">
-                    <CartLinkClientOnly variant="icon" />
-                    <MobileSearchClientOnly />
-                  </div>
+  <CartButtonClientOnly />
+  <MobileSearchClientOnly />
+</div>
+
                 </div>
               </header>
             </StickyHeader>
