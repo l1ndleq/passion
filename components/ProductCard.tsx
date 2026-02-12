@@ -14,19 +14,10 @@ export type Product = {
   image?: string;
 };
 
-export const PRODUCTS: Product[] = [
-  { id: "silk-cleanser", title: "Silk Cleanser", price: 1490, tag: "New" },
-  { id: "glow-serum", title: "Glow Serum", price: 1690, tag: "Bestseller" },
-  { id: "soft-cream", title: "Soft Cream", price: 1490 },
-  { id: "body-oil", title: "Body Oil", price: 1290 },
-  { id: "scrub", title: "Scrub", price: 990, tag: "New" },
-];
-
-
 type ProductCardProps = {
   href: string;
   title: string;
-  price?: number; // ✅ опционально (чтобы на главной не показывать 0 ₽)
+  price?: number;
   image?: string | null;
   badge?: string | null;
   actions?: ReactNode;
@@ -43,43 +34,46 @@ export function ProductCard({
   const img = image?.trim() || "/images/placeholder-product.jpg";
 
   return (
-  <div className="group overflow-hidden rounded-2xl border border-black/10 bg-white shadow-sm transition-all duration-300 ease-out hover:-translate-y-0.5 hover:shadow-md">
-    <Link href={href} className="block">
-      <div className="relative w-full overflow-hidden rounded-3xl bg-black/[0.03] aspect-[4/5]">
-  <Image
-    src={img}
-    alt={title}
-    fill
-    className="object-cover object-top"
-    sizes="(max-width: 1024px) 100vw, 50vw"
-    priority
-  />
-</div>
+    <div className="group flex flex-col">
+      <Link href={href} className="block">
+        {/* IMAGE */}
+        <div className="relative w-full aspect-[3/4] overflow-hidden rounded-2xl bg-black/[0.03]">
+          <Image
+            src={img}
+            alt={title}
+            fill
+            className="object-cover transition-transform duration-500 ease-out group-hover:scale-[1.03]"
+            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+            priority={false}
+          />
 
-
-      <div className="p-4">
-        <h3 className="line-clamp-2 text-sm font-medium leading-snug text-black">
-          {title}
-        </h3>
-
-        <div className="mt-3 flex items-center justify-between gap-3">
-          {typeof price === "number" ? (
-            <span className="text-sm font-semibold text-black">
-              {price.toLocaleString("ru-RU")} ₽
+          {badge && (
+            <span className="absolute left-3 top-3 rounded-full bg-white/90 px-2.5 py-1 text-[10px] uppercase tracking-wide text-black shadow-sm backdrop-blur">
+              {badge}
             </span>
-          ) : (
-            <span />
           )}
-
-          {actions ? (
-            <div className="transition-all duration-300 ease-out md:opacity-0 md:translate-y-1 md:group-hover:opacity-100 md:group-hover:translate-y-0">
-              {actions}
-            </div>
-          ) : null}
         </div>
-      </div>
-    </Link>
-  </div>
-);
 
+        {/* CONTENT */}
+        <div className="pt-3">
+          <h3 className="line-clamp-2 text-[13px] font-medium leading-snug text-black sm:text-sm">
+            {title}
+          </h3>
+
+          {typeof price === "number" && (
+            <div className="mt-1 text-[13px] font-semibold text-black sm:text-sm">
+              {price.toLocaleString("ru-RU")} ₽
+            </div>
+          )}
+        </div>
+      </Link>
+
+      {/* ACTIONS (кнопка добавить и т.п.) */}
+      {actions && (
+        <div className="mt-2 transition-all duration-300 ease-out md:opacity-0 md:translate-y-1 md:group-hover:opacity-100 md:group-hover:translate-y-0">
+          {actions}
+        </div>
+      )}
+    </div>
+  );
 }
