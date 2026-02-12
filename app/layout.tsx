@@ -61,7 +61,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                     <Link href="/contact" className={NAV_LINK}>
                       Контакты
                     </Link>
-                    <CartLinkClientOnly className={NAV_LINK} variant="text" />
+                    <CartLinkClientOnly className={NAV_LINK} />
                     <Link href="/account" className={NAV_LINK}>
                       Кабинет
                     </Link>
