@@ -8,8 +8,6 @@ import MobileSearchClientOnly from "@/components/MobileSearchClientOnly";
 import MobileMenu from "@/components/MobileMenu";
 import CartLinkClientOnly from "@/components/CartLinkClientOnly";
 import { Inter, Cormorant_Garamond } from "next/font/google";
-import CartButtonClientOnly from "@/components/CartButtonClientOnly";
-
 
 const inter = Inter({
   subsets: ["latin", "cyrillic"],
@@ -47,41 +45,41 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <StickyHeader>
               <header className="border-b border-black/10 bg-white/60 backdrop-blur">
                 <div className="mx-auto flex h-12 max-w-6xl items-center px-5 relative">
-                  {/* MOBILE LEFT */}
+                  {/* MOBILE LEFT: burger */}
                   <div className="md:hidden">
                     <MobileMenu />
                   </div>
 
-                  {/* DESKTOP NAV */}
+                  {/* DESKTOP NAV (как было) */}
                   <nav className="hidden md:flex shrink-0 items-center gap-8 text-[11px] uppercase tracking-[0.22em] text-black/60">
                     <Link href="/" className={NAV_LINK}>
                       Главная
                     </Link>
+
                     <Link href="/products" className={NAV_LINK}>
                       Каталог
                     </Link>
+
                     <Link href="/contact" className={NAV_LINK}>
                       Контакты
                     </Link>
-                    <CartLinkClientOnly className={NAV_LINK} variant="text" />
-                    <Link href="/account" className={NAV_LINK} aria-label="Кабинет">
-  <span className="inline-block">Кабинет</span>
-</Link>
 
+                    <CartLinkClientOnly className={NAV_LINK} variant="text" />
+
+                    <Link href="/account" className={NAV_LINK} aria-label="Кабинет">
+                      <span className="inline-block">Кабинет</span>
+                    </Link>
                   </nav>
 
-                  {/* CENTER LOGO (image) */}
-                  <div className="absolute left-1/2 -translate-x-1/2">
-                    <Link
-                      href="/"
-                      aria-label="На главную"
-                      className="inline-flex items-center justify-center min-h-[44px]"
-                    >
+                  {/* MOBILE CENTER LOGO (ТОЛЬКО МОБИЛА) */}
+                  <div className="md:hidden absolute left-1/2 -translate-x-1/2">
+                    <Link href="/" aria-label="На главную" className="inline-flex min-h-[44px] items-center">
+                      {/* если у тебя лого не /logo.png — поменяй путь */}
                       <Image
                         src="/logo.png"
                         alt="Passion"
-                        width={120}
-                        height={24}
+                        width={110}
+                        height={22}
                         priority
                         className="h-[18px] w-auto opacity-90"
                       />
@@ -91,17 +89,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   {/* SPACER */}
                   <div className="flex-1" />
 
-                  {/* DESKTOP SEARCH */}
+                  {/* DESKTOP SEARCH (как было) */}
                   <div className="hidden md:flex w-[560px] max-w-[50%]">
                     <SearchBarClientOnly className="w-full" />
                   </div>
 
-                  {/* MOBILE RIGHT */}
+                  {/* MOBILE RIGHT: cart icon + search */}
                   <div className="md:hidden ml-auto flex items-center gap-1">
-  <CartButtonClientOnly />
-  <MobileSearchClientOnly />
-</div>
-
+                    <CartLinkClientOnly variant="icon" />
+                    <MobileSearchClientOnly />
+                  </div>
                 </div>
               </header>
             </StickyHeader>
