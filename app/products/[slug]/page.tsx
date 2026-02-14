@@ -37,15 +37,17 @@ export default async function ProductPage({
       <section className="mt-8 grid gap-10 md:grid-cols-12">
         {/* image */}
         <div className="md:col-span-7 overflow-hidden rounded-3xl border border-black/10 bg-white">
-          <div className="relative aspect-[4/5] w-full">
+          <div className="relative w-full bg-[#f6f3ef]">
             <Image
-              src={product.image || "/images/placeholder-product.jpg"}
-              alt={product.title}
-              fill
-              priority
-              className="object-contain object-center"
-              sizes="(max-width: 1024px) 100vw, 58vw"
-            />
+  src={product.image || "/images/placeholder-product.jpg"}
+  alt={product.title}
+  width={900}
+  height={1100}
+  priority
+  className="w-full h-auto object-contain"
+  sizes="(max-width: 1024px) 100vw, 58vw"
+/>
+
           </div>
         </div>
 
