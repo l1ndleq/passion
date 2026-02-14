@@ -56,22 +56,22 @@ export default function OrderTrackingClient() {
   const [error, setError] = useState<string | null>(null);
   const [order, setOrder] = useState<PublicOrder | null>(null);
 
-  useEffect(() => {
-    if (!pathname) return;
-    const parts = pathname.split("/").filter(Boolean);
-    const id = parts[parts.length - 1] ?? null;
-    setOrderId(id);
-    setReady(true);
-  }, [pathname]);
-  useEffect(() => {
-  if (!orderId) 
-      const KEY = "passion_orders";
-  const raw = localStorage.getItem(KEY);
-  const list: Array<{ orderId: string; savedAt: number }> = raw ? JSON.parse(raw) : [];
+useEffect(() => {
+  if (!orderId) return;
 
-  const next = [{ orderId, savedAt: Date.now() }, ...list.filter((x) => x.orderId !== orderId)].slice(0, 10);
-  localStorage.setItem(KEY, JSON.stringify(next));
-  }, [orderId]);
+  const KEY = "passion_orders";
+
+  const raw = localStorage.getItem(KEY);
+  const list: Array<{ orderId: string; savedAt: number }> =
+    raw ? JSON.parse(raw) : [];
+
+  const exists = list.some((x) => x.orderId === orderId);
+  if (!exists) {
+    list.push({ orderId, savedAt: Date.now() });
+    localStorage.setItem(KEY, JSON.stringify(list));
+  }
+}, [orderId]);
+
     return;
 
   const KEY = "passion_orders";
