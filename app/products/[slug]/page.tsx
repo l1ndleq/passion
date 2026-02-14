@@ -34,20 +34,20 @@ export default async function ProductPage({
         <span className="text-black/70">{product.title}</span>
       </div>
 
+      {/* ✅ ВОТ ЭТОГО section не хватало */}
       <section className="mt-8 grid gap-10 md:grid-cols-12">
         {/* image */}
-        <div className="md:col-span-7 overflow-hidden rounded-3xl border border-black/10 bg-white">
-          <div className="relative w-full bg-[#f6f3ef]">
+        <div className="md:col-span-7">
+          <div className="overflow-hidden rounded-3xl border border-black/10 bg-white">
             <Image
-  src={product.image || "/images/placeholder-product.jpg"}
-  alt={product.title}
-  width={900}
-  height={1100}
-  priority
-  className="w-full h-auto object-contain"
-  sizes="(max-width: 1024px) 100vw, 58vw"
-/>
-
+              src={product.image || "/images/placeholder-product.jpg"}
+              alt={product.title}
+              width={1200}
+              height={1500}
+              priority
+              className="block h-auto w-full object-cover object-center"
+              sizes="(max-width: 1024px) 100vw, 58vw"
+            />
           </div>
         </div>
 
@@ -95,7 +95,7 @@ export default async function ProductPage({
             />
           </div>
 
-          {/* ✅ details (состав / применение / о продукте) */}
+          {/* details (состав / применение / о продукте) */}
           <ProductDetails
             sections={[
               {
@@ -107,7 +107,6 @@ export default async function ProductPage({
               {
                 title: "Состав",
                 content:
-                  // если в product появится поле ingredients — замени сюда
                   "Aqua, Glycerin, Coco-Glucoside, Panthenol, Sodium Hyaluronate, Chamomilla Extract.",
               },
               {
