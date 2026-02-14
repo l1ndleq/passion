@@ -33,7 +33,6 @@ export default function AddToCartButton({
         },
         1
       );
-      notifyAdded(product.id); // ✅ премиум: открываем мини-корзину
     } else {
       setQty(product.id, qty + 1);
     }
