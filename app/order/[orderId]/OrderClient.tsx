@@ -46,6 +46,15 @@ function formatDate(x?: number) {
   return d.toLocaleString();
 }
 
+function extractOrderId(pathname: string | null) {
+  if (!pathname) return null;
+  // ожидаем /order/<id>
+  const parts = pathname.split("/").filter(Boolean);
+  const idx = parts.indexOf("order");
+  if (idx === -1) return null;
+  return parts[idx + 1] ?? null;
+}
+
 export default function OrderTrackingClient() {
   const pathname = usePathname();
 
@@ -56,42 +65,44 @@ export default function OrderTrackingClient() {
   const [error, setError] = useState<string | null>(null);
   const [order, setOrder] = useState<PublicOrder | null>(null);
 
-useEffect(() => {
-  if (!orderId) return;
+  // 1) достаём orderId из URL
+  useEffect(() => {
+    const id = extractOrderId(pathname);
+    setOrderId(id);
+    setReady(true);
+  }, [pathname]);
 
-  const KEY = "passion_orders";
+  // 2) сохраняем последний заказ + список последних 10
+  useEffect(() => {
+    if (!orderId) return;
 
-  const raw = localStorage.getItem(KEY);
-  const list: Array<{ orderId: string; savedAt: number }> =
-    raw ? JSON.parse(raw) : [];
+    const KEY = "passion_orders";
+    let list: Array<{ orderId: string; savedAt: number }> = [];
 
-  const exists = list.some((x) => x.orderId === orderId);
-  if (!exists) {
-    list.push({ orderId, savedAt: Date.now() });
-    localStorage.setItem(KEY, JSON.stringify(list));
-  }
-}, [orderId]);
+    try {
+      const raw = localStorage.getItem(KEY);
+      list = raw ? JSON.parse(raw) : [];
+      if (!Array.isArray(list)) list = [];
+    } catch {
+      list = [];
+    }
 
-    return;
+    const next = [
+      { orderId, savedAt: Date.now() },
+      ...list.filter((x) => x?.orderId && x.orderId !== orderId),
+    ].slice(0, 10);
 
-  const KEY = "passion_orders";
-  const raw = localStorage.getItem(KEY);
-  const list: Array<{ orderId: string; savedAt: number }> = raw ? JSON.parse(raw) : [];
-
-  const next = [
-    { orderId, savedAt: Date.now() },
-    ...list.filter((x) => x.orderId !== orderId),
-  ].slice(0, 10); // храним до 10 последних
-
-  localStorage.setItem(KEY, JSON.stringify(next));
-  localStorage.setItem("passion_last_order", orderId);
-}, [orderId]);
-
+    try {
+      localStorage.setItem(KEY, JSON.stringify(next));
+      localStorage.setItem("passion_last_order", orderId);
+    } catch {}
+  }, [orderId]);
 
   const GET_URL = orderId ? `/api/orders/${orderId}` : null;
 
   async function load() {
     if (!GET_URL || !orderId) return;
+
     setLoading(true);
     setError(null);
 
@@ -120,6 +131,7 @@ useEffect(() => {
     }
   }
 
+  // 3) грузим заказ
   useEffect(() => {
     if (ready && orderId) load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -136,18 +148,22 @@ useEffect(() => {
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="text-sm text-neutral-500">Отслеживание заказа</div>
-          <div className="mt-1 text-2xl font-semibold">#{order?.orderId ?? orderId}</div>
+          <div className="mt-1 text-2xl font-semibold">
+            #{order?.orderId ?? orderId}
+          </div>
           <div className="mt-2 text-xs text-neutral-500">
-            Создан: {formatDate(order?.createdAt)} • Обновлён: {formatDate(order?.updatedAt)}
+            Создан: {formatDate(order?.createdAt)} • Обновлён:{" "}
+            {formatDate(order?.updatedAt)}
           </div>
         </div>
 
-  <button
-    onClick={() => navigator.clipboard.writeText(window.location.href)}
-    className="border rounded-xl px-4 py-2 text-sm hover:bg-neutral-50"
-  >
-    Скопировать ссылку
-  </button>
+        <button
+          onClick={() => navigator.clipboard.writeText(window.location.href)}
+          className="border rounded-xl px-4 py-2 text-sm hover:bg-neutral-50"
+        >
+          Скопировать ссылку
+        </button>
+
         <button
           onClick={load}
           disabled={loading}
@@ -164,9 +180,13 @@ useEffect(() => {
       )}
 
       {loading ? (
-        <div className="border rounded-xl p-6 text-sm text-neutral-500">Загрузка…</div>
+        <div className="border rounded-xl p-6 text-sm text-neutral-500">
+          Загрузка…
+        </div>
       ) : !order ? (
-        <div className="border rounded-xl p-6 text-sm text-neutral-500">Заказ не найден</div>
+        <div className="border rounded-xl p-6 text-sm text-neutral-500">
+          Заказ не найден
+        </div>
       ) : (
         <>
           <div className="border rounded-xl p-4 flex items-center justify-between gap-3">
@@ -192,7 +212,10 @@ useEffect(() => {
             {order.items?.length ? (
               <>
                 {order.items.map((it, i) => (
-                  <div key={i} className="flex justify-between items-center text-sm py-1">
+                  <div
+                    key={i}
+                    className="flex justify-between items-center text-sm py-1"
+                  >
                     <span>{it.title}</span>
                     <span>
                       {it.qty} × {it.price}
