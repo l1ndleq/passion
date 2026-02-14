@@ -43,7 +43,7 @@ export default async function ProductPage({
               alt={product.title}
               fill
               priority
-              className="object-cover object-center"
+              className="object-contain object-center"
               sizes="(max-width: 1024px) 100vw, 58vw"
             />
           </div>
