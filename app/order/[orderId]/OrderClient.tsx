@@ -64,7 +64,15 @@ export default function OrderTrackingClient() {
     setReady(true);
   }, [pathname]);
   useEffect(() => {
-  if (!orderId) return;
+  if (!orderId) 
+      const KEY = "passion_orders";
+  const raw = localStorage.getItem(KEY);
+  const list: Array<{ orderId: string; savedAt: number }> = raw ? JSON.parse(raw) : [];
+
+  const next = [{ orderId, savedAt: Date.now() }, ...list.filter((x) => x.orderId !== orderId)].slice(0, 10);
+  localStorage.setItem(KEY, JSON.stringify(next));
+  }, [orderId]);
+    return;
 
   const KEY = "passion_orders";
   const raw = localStorage.getItem(KEY);
