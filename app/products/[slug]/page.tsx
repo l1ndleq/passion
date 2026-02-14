@@ -1,14 +1,11 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
-import CartButtonClientOnly from "@/components/CartButtonClientOnly";
-import { PRODUCTS } from "@/app/lib/products";
-import CartLinkClientOnly from "@/components/CartLinkClientOnly";
-import AddToCartButton from "@/components/add-to-cart-button";
-import { ProductCard } from "@/components/ProductCard";
-import ProductsGridClient from "@/components/ProductsGridClient";
 import Image from "next/image";
+import { notFound } from "next/navigation";
 
-
+import { PRODUCTS } from "@/app/lib/products";
+import AddToCartButton from "@/components/add-to-cart-button";
+import ProductsGridClient from "@/components/ProductsGridClient";
+import ProductDetails from "@/components/ProductDetails";
 
 export default async function ProductPage({
   params,
@@ -19,8 +16,8 @@ export default async function ProductPage({
 
   const product = PRODUCTS.find((p) => p.id === slug);
   if (!product) return notFound();
-  const others = PRODUCTS.filter((p) => p.id !== slug).slice(0, 3);
 
+  const others = PRODUCTS.filter((p) => p.id !== slug).slice(0, 3);
 
   return (
     <main className="mx-auto max-w-6xl px-5 py-10">
@@ -40,18 +37,17 @@ export default async function ProductPage({
       <section className="mt-8 grid gap-10 md:grid-cols-12">
         {/* image */}
         <div className="md:col-span-7 overflow-hidden rounded-3xl border border-black/10 bg-white">
-  <div className="relative aspect-[4/5] w-full">
-    <Image
-      src={product.image || "/images/placeholder-product.jpg"}
-      alt={product.title}
-      fill
-      priority
-      className="object-cover object-center"
-      sizes="(max-width: 1024px) 100vw, 58vw"
-    />
-  </div>
-</div>
-
+          <div className="relative aspect-[4/5] w-full">
+            <Image
+              src={product.image || "/images/placeholder-product.jpg"}
+              alt={product.title}
+              fill
+              priority
+              className="object-cover object-center"
+              sizes="(max-width: 1024px) 100vw, 58vw"
+            />
+          </div>
+        </div>
 
         {/* info */}
         <div className="md:col-span-5">
@@ -75,7 +71,7 @@ export default async function ProductPage({
             </div>
           </div>
 
-                    <div className="mt-6 flex flex-wrap gap-3">
+          <div className="mt-6 flex flex-wrap gap-3">
             <Link
               href="/products"
               className="inline-flex items-center justify-center rounded-full
@@ -88,9 +84,37 @@ export default async function ProductPage({
             </Link>
 
             <AddToCartButton
-              product={{ id: product.id, title: product.title, price: product.price }}
+              product={{
+                id: product.id,
+                title: product.title,
+                price: product.price,
+                image: product.image,
+              }}
             />
           </div>
+
+          {/* ✅ details (состав / применение / о продукте) */}
+          <ProductDetails
+            sections={[
+              {
+                title: "О продукте",
+                content:
+                  product.description ||
+                  "Мягкое ежедневное очищение, которое бережно удаляет загрязнения, сохраняя комфорт кожи.",
+              },
+              {
+                title: "Состав",
+                content:
+                  // если в product появится поле ingredients — замени сюда
+                  "Aqua, Glycerin, Coco-Glucoside, Panthenol, Sodium Hyaluronate, Chamomilla Extract.",
+              },
+              {
+                title: "Способ применения",
+                content:
+                  "Нанесите небольшое количество на влажную кожу, мягко массируйте 30–40 секунд, затем смойте теплой водой.",
+              },
+            ]}
+          />
 
           {others.length > 0 ? (
             <section className="mt-16">
