@@ -10,6 +10,22 @@ function makeOrderId() {
   return `P-${Date.now().toString(36).toUpperCase()}`;
 }
 
+type Delivery = {
+  provider?: string; // "cdek"
+  type?: string; // "pvz" | "door"
+  price?: number;
+  period_min?: number;
+  period_max?: number;
+  tariff_code?: number;
+  pvz?: {
+    code?: string;
+    address?: string;
+    name?: string;
+  };
+  raw?: any;
+  [k: string]: any;
+};
+
 type CreatePayBody = {
   customer?: {
     name?: string;
@@ -28,6 +44,7 @@ type CreatePayBody = {
     image?: string;
   }>;
   totalPrice?: number;
+  delivery?: Delivery | null;
 };
 
 function getRedisOrThrow() {
@@ -44,7 +61,6 @@ function getRedisOrThrow() {
 function normalizePhone(raw: string) {
   let s = String(raw || "").trim().replace(/[^\d+]/g, "");
 
-  // RU -> +7
   if (s.startsWith("8") && s.length === 11) s = "+7" + s.slice(1);
   if (s.startsWith("7") && s.length === 11) s = "+7" + s.slice(1);
   if (s.startsWith("9") && s.length === 10) s = "+7" + s;
@@ -128,6 +144,7 @@ async function sendAdminTelegram({ text, orderUrl }: { text: string; orderUrl: s
 
   return okCount > 0;
 }
+
 /** ===== Telegram: User (PassionLoginBot) ===== */
 async function sendUserTelegram({
   chatId,
@@ -138,7 +155,7 @@ async function sendUserTelegram({
   text: string;
   orderUrl: string;
 }) {
-  const token = process.env.TELEGRAM_LOGIN_BOT_TOKEN; // ✅ логин-бот
+  const token = process.env.TELEGRAM_LOGIN_BOT_TOKEN;
   if (!token || !chatId) return;
 
   const keyboard = orderUrl
@@ -163,6 +180,51 @@ async function sendUserTelegram({
   }
 }
 
+function normalizeDelivery(input: any): Delivery | null {
+  if (!input) return null;
+
+  const provider = String(input.provider || "cdek").trim().toLowerCase();
+  const type = String(input.type || input.delivery?.type || "").trim().toLowerCase();
+
+  const price = input.price == null ? undefined : Number(input.price);
+  const period_min = input.period_min == null ? undefined : Number(input.period_min);
+  const period_max = input.period_max == null ? undefined : Number(input.period_max);
+  const tariff_code = input.tariff_code == null ? undefined : Number(input.tariff_code);
+
+  const pvz = input.pvz || input.point || {};
+  const pvzCode = pvz?.code ? String(pvz.code) : undefined;
+  const pvzAddress = pvz?.address ? String(pvz.address) : undefined;
+  const pvzName = pvz?.name ? String(pvz.name) : undefined;
+
+  const out: Delivery = {
+    provider,
+    type,
+    pvz: {
+      ...(pvzCode ? { code: pvzCode } : {}),
+      ...(pvzAddress ? { address: pvzAddress } : {}),
+      ...(pvzName ? { name: pvzName } : {}),
+    },
+    ...(Number.isFinite(price as number) ? { price } : {}),
+    ...(Number.isFinite(period_min as number) ? { period_min } : {}),
+    ...(Number.isFinite(period_max as number) ? { period_max } : {}),
+    ...(Number.isFinite(tariff_code as number) ? { tariff_code } : {}),
+  };
+
+  if (input.raw) out.raw = input.raw;
+
+  const hasAny =
+    out.provider ||
+    out.type ||
+    out.price != null ||
+    out.period_min != null ||
+    out.period_max != null ||
+    out.tariff_code != null ||
+    out.pvz?.code ||
+    out.pvz?.address ||
+    out.pvz?.name;
+
+  return hasAny ? out : null;
+}
 
 function formatAdminOrderText(order: {
   orderId: string;
@@ -171,6 +233,7 @@ function formatAdminOrderText(order: {
   customer: any;
   items: any[];
   totalPrice: number;
+  delivery?: Delivery | null;
 }) {
   const c = order.customer ?? {};
   const statusLine = order.status === "paid" ? "Оплачено ✅" : "Не оплачено ⏳";
@@ -197,6 +260,19 @@ function formatAdminOrderText(order: {
   if (address) lines.push(`<b>Адрес:</b> ${address}`);
   if (message) lines.push(`<b>Комментарий:</b> ${message}`);
 
+  if (order.delivery) {
+    const d = order.delivery;
+    lines.push("");
+    lines.push(`<b>🚚 Доставка:</b> ${escapeHtml((d.provider || "cdek").toUpperCase())}`);
+
+    const typeLabel =
+      d.type === "pvz" ? "ПВЗ" : d.type === "door" ? "До двери" : d.type ? d.type : "";
+    if (typeLabel) lines.push(`<b>Тип:</b> ${escapeHtml(typeLabel)}`);
+
+    if (d.pvz?.address) lines.push(`<b>ПВЗ:</b> ${escapeHtml(d.pvz.address)}`);
+    if (d.pvz?.code) lines.push(`<b>Код ПВЗ:</b> <code>${escapeHtml(d.pvz.code)}</code>`);
+  }
+
   lines.push("");
   lines.push(`<b>Товары:</b>`);
   for (const it of order.items || []) {
@@ -209,10 +285,7 @@ function formatAdminOrderText(order: {
   return lines.join("\n");
 }
 
-function formatUserOrderText(order: {
-  orderId: string;
-  totalPrice: number;
-}) {
+function formatUserOrderText(order: { orderId: string; totalPrice: number }) {
   const lines: string[] = [];
   lines.push(`✅ <b>Заказ оформлен</b>`);
   lines.push(`Номер: <code>${order.orderId}</code>`);
@@ -251,41 +324,48 @@ export async function POST(req: Request) {
     const telegramRaw = customer.telegram == null ? "" : String(customer.telegram).trim();
     const telegram = telegramRaw.replace(/^@/, "");
 
+    const delivery = normalizeDelivery(body.delivery); // ✅ опционально
+
+    // ✅ если выбрали ПВЗ, а адрес не заполнили — подставим ПВЗ в customer.address
+    const mergedCustomer = {
+      ...customer,
+      name,
+      phone,
+      telegram: telegram ? telegram : null,
+      city: (customer.city ?? "").toString(),
+      address:
+        (customer.address ?? "").toString() ||
+        (delivery?.pvz?.address ? String(delivery.pvz.address) : ""),
+    };
+
     const orderId = makeOrderId();
 
-const order = {
-  orderId,
-  status: "pending_payment" as const,
-  createdAt: Date.now(),
-  updatedAt: Date.now(),
-  statusHistory: [{ status: "pending_payment", at: Date.now(), by: "system" as const }],
-  customer: {
-    ...customer,
-    name,
-    phone,
-    telegram: telegram ? telegram : null,
-  },
-  items,
-  totalPrice,
-};
-
+    const order = {
+      orderId,
+      status: "pending_payment" as const,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      statusHistory: [{ status: "pending_payment", at: Date.now(), by: "system" as const }],
+      customer: mergedCustomer,
+      items,
+      totalPrice,
+      delivery, // может быть null
+    };
 
     const redis = getRedisOrThrow();
 
-    // ✅ сохраняем профиль пользователя для автозаполнения checkout
-const PROFILE_TTL_SECONDS = 60 * 60 * 24 * 365; // 1 год
-await redis.set(
-  `user:profile:${digits}`,
-  {
-    name,
-    phone,
-    telegram: telegram ? telegram : null,
-    city: customer.city ?? "",
-    address: customer.address ?? "",
-  },
-  { ex: PROFILE_TTL_SECONDS }
-);
-
+    const PROFILE_TTL_SECONDS = 60 * 60 * 24 * 365; // 1 год
+    await redis.set(
+      `user:profile:${digits}`,
+      {
+        name,
+        phone,
+        telegram: telegram ? telegram : null,
+        city: mergedCustomer.city ?? "",
+        address: mergedCustomer.address ?? "",
+      },
+      { ex: PROFILE_TTL_SECONDS }
+    );
 
     await redis.set(`order:${orderId}`, order, { ex: ORDER_TTL_SECONDS });
 
@@ -299,33 +379,28 @@ await redis.set(
     const adminOrderUrl = `${siteUrl}/admin/orders/${orderId}`;
     const userOrderUrl = `${siteUrl}/order/${orderId}`;
 
-    // ✅ Админам
     const adminNotifyKey = `order:${orderId}:tg_admin_created`;
-const adminAlready = await redis.get(adminNotifyKey);
+    const adminAlready = await redis.get(adminNotifyKey);
 
-if (!adminAlready) {
-  const sent = await sendAdminTelegram({ text: formatAdminOrderText(order), orderUrl: adminOrderUrl });
-  if (sent) {
-    await redis.set(adminNotifyKey, 1, { ex: ORDER_TTL_SECONDS });
-  }
-}
+    if (!adminAlready) {
+      const sent = await sendAdminTelegram({ text: formatAdminOrderText(order), orderUrl: adminOrderUrl });
+      if (sent) await redis.set(adminNotifyKey, 1, { ex: ORDER_TTL_SECONDS });
+    }
 
-
-    // ✅ Пользователю (если телефон привязан к TG)
     const userNotifyKey = `order:${orderId}:tg_user_created`;
-const userAlready = await redis.get(userNotifyKey);
+    const userAlready = await redis.get(userNotifyKey);
 
-if (!userAlready) {
-  const chatId = await redis.get<number>(`tg:phone:${digits}`);
-  if (chatId) {
-    await sendUserTelegram({
-      chatId,
-      text: formatUserOrderText({ orderId, totalPrice }),
-      orderUrl: userOrderUrl,
-    });
-    await redis.set(userNotifyKey, 1, { ex: ORDER_TTL_SECONDS });
-  }
-}
+    if (!userAlready) {
+      const chatId = await redis.get<number>(`tg:phone:${digits}`);
+      if (chatId) {
+        await sendUserTelegram({
+          chatId,
+          text: formatUserOrderText({ orderId, totalPrice }),
+          orderUrl: userOrderUrl,
+        });
+        await redis.set(userNotifyKey, 1, { ex: ORDER_TTL_SECONDS });
+      }
+    }
 
     const paymentUrl = `${siteUrl}/order/${orderId}`;
     return NextResponse.json({ ok: true, orderId, paymentUrl });
