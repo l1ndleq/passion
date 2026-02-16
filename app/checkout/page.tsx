@@ -1,12 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useCart } from "@/components/cart/CartProvider";
 import { getUserProfile, mergeUserProfile } from "@/app/lib/userProfile";
-import { useRef } from "react";
-
-
 
 type CheckoutForm = {
   name: string;
@@ -15,6 +12,21 @@ type CheckoutForm = {
   city?: string;
   address?: string;
   comment?: string;
+
+  // ✅ MVP ПВЗ
+  pvzCity?: string;
+  pvzAddress?: string;
+  pvzCode?: string;
+};
+
+type Delivery = {
+  provider: "cdek";
+  type: "pvz";
+  pvz: {
+    city?: string;
+    address?: string;
+    code?: string;
+  };
 };
 
 export default function CheckoutPage() {
@@ -28,62 +40,68 @@ export default function CheckoutPage() {
     city: "",
     address: "",
     comment: "",
+
+    pvzCity: "",
+    pvzAddress: "",
+    pvzCode: "",
   });
+
   const lastLoadedDigitsRef = useRef<string>("");
 
-useEffect(() => {
-  const raw = form.phone || "";
-  const digits = raw.replace(/[^\d]/g, "");
+  useEffect(() => {
+    const raw = form.phone || "";
+    const digits = raw.replace(/[^\d]/g, "");
+    if (digits.length < 10) return;
 
-  if (digits.length < 10) return;
+    const t = setTimeout(async () => {
+      if (lastLoadedDigitsRef.current === digits) return;
 
-  const t = setTimeout(async () => {
-    if (lastLoadedDigitsRef.current === digits) return;
+      try {
+        const r = await fetch(`/api/profile?phone=${encodeURIComponent(form.phone)}`);
+        const j = await r.json().catch(() => null);
+        if (!r.ok || !j?.ok || !j?.profile) return;
 
-    try {
-      const r = await fetch(`/api/profile?phone=${encodeURIComponent(form.phone)}`);
-      const j = await r.json().catch(() => null);
+        lastLoadedDigitsRef.current = digits;
 
-      if (!r.ok || !j?.ok || !j?.profile) return;
+        const p = j.profile as {
+          name?: string;
+          telegram?: string | null;
+          city?: string;
+          address?: string;
+        };
 
-      lastLoadedDigitsRef.current = digits;
+        setForm((prev) => ({
+          ...prev,
+          name: prev.name || p.name || "",
+          telegram: prev.telegram || (p.telegram || "") || "",
+          city: prev.city || p.city || "",
+          address: prev.address || p.address || "",
 
-      const p = j.profile as {
-        name?: string;
-        telegram?: string | null;
-        city?: string;
-        address?: string;
-      };
+          // ✅ если не введено — подтянем город в ПВЗ
+          pvzCity: prev.pvzCity || p.city || "",
+        }));
+      } catch (e) {
+        console.warn("profile autofill failed", e);
+      }
+    }, 350);
 
-      setForm((prev) => ({
-        ...prev,
-        name: prev.name || p.name || "",
-        telegram: prev.telegram || (p.telegram || "") || "",
-        city: prev.city || p.city || "",
-        address: prev.address || p.address || "",
-      }));
-    } catch (e) {
-      console.warn("profile autofill failed", e);
-    }
-  }, 350);
-
-  return () => clearTimeout(t);
-}, [form.phone]);
+    return () => clearTimeout(t);
+  }, [form.phone]);
 
   useEffect(() => {
-  const p = getUserProfile();
-  if (!p) return;
+    const p = getUserProfile();
+    if (!p) return;
 
-  setForm((prev) => ({
-    ...prev,
-    name: prev.name || p.name || "",
-    phone: prev.phone || p.phone || "",
-    telegram: prev.telegram || p.telegram || "",
-    city: prev.city || p.city || "",
-    address: prev.address || p.address || "",
-  }));
-}, []);
-
+    setForm((prev) => ({
+      ...prev,
+      name: prev.name || p.name || "",
+      phone: prev.phone || p.phone || "",
+      telegram: prev.telegram || p.telegram || "",
+      city: prev.city || p.city || "",
+      address: prev.address || p.address || "",
+      pvzCity: prev.pvzCity || p.city || "",
+    }));
+  }, []);
 
   const [loadingMe, setLoadingMe] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -91,7 +109,6 @@ useEffect(() => {
 
   const isCartEmpty = useMemo(() => !items || items.length === 0, [items]);
 
-  // ✅ Автозаполнение из ЛК (если /api/me отдаёт профиль)
   useEffect(() => {
     let cancelled = false;
 
@@ -111,6 +128,8 @@ useEffect(() => {
           telegram: me.telegram ?? prev.telegram,
           city: me.city ?? prev.city,
           address: me.address ?? prev.address,
+
+          pvzCity: me.city ?? prev.pvzCity,
         }));
       } catch {
       } finally {
@@ -135,6 +154,11 @@ useEffect(() => {
     if (digits.length < 10) return "Телефон введён некорректно";
 
     if (isCartEmpty) return "Корзина пуста";
+
+    // ✅ ПВЗ обязателен
+    if (!String(form.pvzCity || "").trim()) return "Укажите город для ПВЗ";
+    if (!String(form.pvzAddress || "").trim()) return "Укажите адрес/название ПВЗ";
+
     return null;
   }
 
@@ -147,73 +171,58 @@ useEffect(() => {
 
     setSubmitting(true);
 
+    const delivery: Delivery = {
+      provider: "cdek",
+      type: "pvz",
+      pvz: {
+        city: String(form.pvzCity || "").trim(),
+        address: String(form.pvzAddress || "").trim(),
+        code: String(form.pvzCode || "").trim() || undefined,
+      },
+    };
+
     try {
-      const payload = {
-        customer: {
-          name: form.name.trim(),
-          phone: form.phone.trim(),
-          telegram: (form.telegram || "").trim() || undefined,
-          city: (form.city || "").trim() || undefined,
-          address: (form.address || "").trim() || undefined,
-        },
-        comment: (form.comment || "").trim() || undefined,
-
-        // ✅ Корзина (под /api/pay/create)
-    items: items.map((it) => ({
-  id: it.id,
-  name: it.name,
-  price: it.price,
-  quantity: it.qty, // 👈 ВАЖНО
-})),
-        total,
-      };
-
       const res = await fetch("/api/pay/create", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({
-    customer: {
-      name: form.name,
-      phone: form.phone,
-      telegram: form.telegram || null,
-      city: form.city || "",
-      address: form.address || "",
-      message: form.comment || "",
-    },
-    items: items.map((i) => ({
-      id: i.id,
-      title: i.name,
-      price: i.price,
-      qty: i.qty,
-      image: i.image,
-    })),
-    totalPrice: total, // ← ВОТ ЭТО КРИТИЧНО
-  }),
-});
-mergeUserProfile({
-  name: form.name,
-  phone: form.phone,
-  telegram: form.telegram,
-  city: form.city,
-  address: form.address,
-});
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customer: {
+            name: form.name.trim(),
+            phone: form.phone.trim(),
+            telegram: (form.telegram || "").trim() || null,
+            city: (form.city || "").trim(),
+            address: (form.address || "").trim(),
+            message: (form.comment || "").trim(),
+          },
+          items: items.map((i) => ({
+            id: i.id,
+            title: i.name,
+            price: i.price,
+            qty: i.qty,
+            image: i.image,
+          })),
+          totalPrice: total,
+          delivery, // ✅ вот он
+        }),
+      });
 
+      mergeUserProfile({
+        name: form.name,
+        phone: form.phone,
+        telegram: form.telegram,
+        city: form.city,
+        address: form.address,
+      });
 
       const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || data?.message || "Не удалось создать заказ");
 
-      if (!res.ok) {
-        throw new Error(data?.error || data?.message || "Не удалось создать заказ");
-      }
-
-      // ✅ Очистка корзины после заказа
       clearCart();
 
-      // ✅ Редирект
       if (data?.paymentUrl) {
         window.location.href = data.paymentUrl;
         return;
       }
-
       if (data?.orderId) {
         router.push(`/order/${data.orderId}`);
         return;
@@ -253,7 +262,6 @@ mergeUserProfile({
               placeholder="Имя *"
               value={form.name}
               onChange={(e) => setField("name", e.target.value)}
-              autoComplete="name"
               disabled={submitting}
             />
 
@@ -262,7 +270,6 @@ mergeUserProfile({
               placeholder="Телефон *"
               value={form.phone}
               onChange={(e) => setField("phone", e.target.value)}
-              autoComplete="tel"
               disabled={submitting}
             />
 
@@ -274,21 +281,37 @@ mergeUserProfile({
               disabled={submitting}
             />
 
-            <input
-              className="h-12 rounded-xl border border-neutral-200 px-4 text-sm outline-none focus:border-neutral-400"
-              placeholder="Город"
-              value={form.city || ""}
-              onChange={(e) => setField("city", e.target.value)}
-              disabled={submitting}
-            />
+            {/* ✅ Блок ПВЗ */}
+            <div className="mt-2 rounded-2xl border border-neutral-200 p-4">
+              <div className="text-sm font-medium">Доставка: СДЭК (ПВЗ)</div>
+              <div className="mt-1 text-xs text-neutral-500">
+                Пока без автоматического API: укажи ПВЗ, мы оформим отправку вручную.
+              </div>
 
-            <input
-              className="h-12 rounded-xl border border-neutral-200 px-4 text-sm outline-none focus:border-neutral-400"
-              placeholder="Адрес"
-              value={form.address || ""}
-              onChange={(e) => setField("address", e.target.value)}
-              disabled={submitting}
-            />
+              <div className="mt-3 grid gap-3">
+                <input
+                  className="h-12 rounded-xl border border-neutral-200 px-4 text-sm outline-none focus:border-neutral-400"
+                  placeholder="Город ПВЗ *"
+                  value={form.pvzCity || ""}
+                  onChange={(e) => setField("pvzCity", e.target.value)}
+                  disabled={submitting}
+                />
+                <input
+                  className="h-12 rounded-xl border border-neutral-200 px-4 text-sm outline-none focus:border-neutral-400"
+                  placeholder="Адрес/название ПВЗ *"
+                  value={form.pvzAddress || ""}
+                  onChange={(e) => setField("pvzAddress", e.target.value)}
+                  disabled={submitting}
+                />
+                <input
+                  className="h-12 rounded-xl border border-neutral-200 px-4 text-sm outline-none focus:border-neutral-400"
+                  placeholder="Код ПВЗ (если есть)"
+                  value={form.pvzCode || ""}
+                  onChange={(e) => setField("pvzCode", e.target.value)}
+                  disabled={submitting}
+                />
+              </div>
+            </div>
 
             <textarea
               className="min-h-[120px] rounded-xl border border-neutral-200 px-4 py-3 text-sm outline-none focus:border-neutral-400"
@@ -309,13 +332,11 @@ mergeUserProfile({
               disabled={submitting}
               className="mt-2 h-12 rounded-full bg-black text-sm font-medium text-white disabled:opacity-60"
             >
-              {submitting ? "Переходим к оплате..." : "Перейти к оплате"}
+              {submitting ? "Оформляем..." : "Перейти к оплате"}
             </button>
 
             <div className="text-center text-xs text-neutral-500">
-              {loadingMe
-                ? "Загружаем данные из личного кабинета…"
-                : "После оплаты вы будете перенаправлены на страницу подтверждения"}
+              {loadingMe ? "Загружаем данные…" : "После оплаты вы будете перенаправлены на страницу подтверждения"}
             </div>
           </div>
         </form>
