@@ -40,11 +40,13 @@ export default function CheckoutPage() {
     city: "",
     address: "",
     comment: "",
-
     pvzCity: "",
     pvzAddress: "",
     pvzCode: "",
   });
+
+  // ✅ согласие на обработку ПД
+  const [agree, setAgree] = useState(false);
 
   const lastLoadedDigitsRef = useRef<string>("");
 
@@ -76,8 +78,6 @@ export default function CheckoutPage() {
           telegram: prev.telegram || (p.telegram || "") || "",
           city: prev.city || p.city || "",
           address: prev.address || p.address || "",
-
-          // ✅ если не введено — подтянем город в ПВЗ
           pvzCity: prev.pvzCity || p.city || "",
         }));
       } catch (e) {
@@ -128,7 +128,6 @@ export default function CheckoutPage() {
           telegram: me.telegram ?? prev.telegram,
           city: me.city ?? prev.city,
           address: me.address ?? prev.address,
-
           pvzCity: me.city ?? prev.pvzCity,
         }));
       } catch {
@@ -158,6 +157,9 @@ export default function CheckoutPage() {
     // ✅ ПВЗ обязателен
     if (!String(form.pvzCity || "").trim()) return "Укажите город для ПВЗ";
     if (!String(form.pvzAddress || "").trim()) return "Укажите адрес/название ПВЗ";
+
+    // ✅ согласие на ПД
+    if (!agree) return "Необходимо согласие на обработку персональных данных";
 
     return null;
   }
@@ -202,7 +204,9 @@ export default function CheckoutPage() {
             image: i.image,
           })),
           totalPrice: total,
-          delivery, // ✅ вот он
+          delivery,
+          // можно логировать факт согласия:
+          consent: { personalData: true, at: Date.now() },
         }),
       });
 
@@ -321,6 +325,29 @@ export default function CheckoutPage() {
               disabled={submitting}
             />
 
+            {/* ✅ Согласие на обработку ПД */}
+            <label className="mt-2 flex items-start gap-3 text-xs text-neutral-600">
+              <input
+                type="checkbox"
+                checked={agree}
+                onChange={(e) => setAgree(e.target.checked)}
+                className="mt-1 h-4 w-4 accent-black"
+                disabled={submitting}
+              />
+              <span>
+                Я даю согласие на обработку персональных данных в соответствии с{" "}
+                <a
+                  href="/privacy"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline hover:opacity-70"
+                >
+                  Политикой конфиденциальности
+                </a>
+                .
+              </span>
+            </label>
+
             {error ? (
               <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                 {error}
@@ -329,7 +356,7 @@ export default function CheckoutPage() {
 
             <button
               type="submit"
-              disabled={submitting}
+              disabled={submitting || !agree}
               className="mt-2 h-12 rounded-full bg-black text-sm font-medium text-white disabled:opacity-60"
             >
               {submitting ? "Оформляем..." : "Перейти к оплате"}
