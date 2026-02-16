@@ -11,7 +11,6 @@ type Product = {
   subtitle: string;
   category: string;
   note: string;
-  // если позже добавишь картинки — просто начни прокидывать сюда:
   image?: string;
   badge?: string;
 };
