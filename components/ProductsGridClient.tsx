@@ -6,14 +6,17 @@ import { useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 
 type Product = {
-  id: string; // у тебя в PRODUCTS обычно id = slug
-  name: string;
+  id?: string;
+  slug?: string;
+  name?: string;
+  title?: string;
   subtitle?: string;
   category?: string;
   note?: string;
   badge?: string;
   image?: string;
   price?: number;
+  [k: string]: any;
 };
 
 function normalize(str: string) {
@@ -29,7 +32,16 @@ function matchesProduct(product: Product, query: string) {
   if (!q) return true;
 
   const hay = normalize(
-    [product.name, product.subtitle, product.category, product.note, product.badge, product.id]
+    [
+      product.name,
+      product.title,
+      product.subtitle,
+      product.category,
+      product.note,
+      product.badge,
+      product.slug,
+      product.id,
+    ]
       .filter(Boolean)
       .join(" ")
   );
@@ -54,39 +66,43 @@ export default function ProductsGridClient({ products }: { products: Product[] }
       ) : null}
 
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {filteredProducts.map((p) => (
-          <Link
-            key={p.id}
-            href={`/products/${p.id}`}
-            className="group block"
-          >
-            <div className="relative overflow-hidden rounded-3xl bg-black/[0.04]">
-              {p.badge ? (
-                <div className="absolute left-4 top-4 z-10 rounded-full bg-white/80 px-3 py-1 text-[10px] font-semibold tracking-[0.18em] uppercase">
-                  {p.badge}
+        {filteredProducts.map((p) => {
+          const id = p.id || p.slug;
+          if (!id) return null;
+
+          const title = p.name || p.title || "Товар";
+
+          return (
+            <Link key={id} href={`/products/${id}`} className="group block">
+              <div className="relative overflow-hidden rounded-3xl bg-black/[0.04]">
+                {p.badge ? (
+                  <div className="absolute left-4 top-4 z-10 rounded-full bg-white/80 px-3 py-1 text-[10px] font-semibold tracking-[0.18em] uppercase">
+                    {p.badge}
+                  </div>
+                ) : null}
+
+                <div className="relative aspect-[4/3] w-full">
+                  <Image
+                    src={p.image || "/products/placeholder.jpg"}
+                    alt={title}
+                    fill
+                    className="object-cover transition-transform duration-500 group-hover:scale-[1.02]"
+                    sizes="(max-width: 1024px) 50vw, 33vw"
+                  />
                 </div>
-              ) : null}
-
-              <div className="relative aspect-[4/3] w-full">
-                <Image
-                  src={p.image || "/products/placeholder.jpg"}
-                  alt={p.name}
-                  fill
-                  className="object-cover transition-transform duration-500 group-hover:scale-[1.02]"
-                  sizes="(max-width: 1024px) 50vw, 33vw"
-                  priority={false}
-                />
               </div>
-            </div>
 
-            <div className="mt-3">
-              <div className="text-sm font-semibold text-neutral-900">{p.name}</div>
-              {typeof p.price === "number" ? (
-                <div className="mt-1 text-sm font-semibold">{p.price.toLocaleString("ru-RU")} ₽</div>
-              ) : null}
-            </div>
-          </Link>
-        ))}
+              <div className="mt-3">
+                <div className="text-sm font-semibold text-neutral-900">{title}</div>
+                {typeof p.price === "number" ? (
+                  <div className="mt-1 text-sm font-semibold">
+                    {p.price.toLocaleString("ru-RU")} ₽
+                  </div>
+                ) : null}
+              </div>
+            </Link>
+          );
+        })}
       </div>
     </>
   );
