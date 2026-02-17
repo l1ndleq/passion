@@ -1,13 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 
-export default function AdminLoginClient() {
-  const sp = useSearchParams();
+export default function AdminLoginClient({ nextPath }: { nextPath: string }) {
   const router = useRouter();
-
-  const nextPath = useMemo(() => sp.get("next") || "/admin/orders", [sp]);
 
   const [login, setLogin] = useState("");
   const [password, setPassword] = useState("");
@@ -46,7 +43,9 @@ export default function AdminLoginClient() {
     <main className="min-h-[70vh] flex items-center justify-center px-5 py-14">
       <div className="w-full max-w-sm rounded-2xl border border-black/10 bg-white p-6 shadow-sm">
         <div className="mb-6">
-          <div className="text-xs uppercase tracking-[0.22em] text-black/55">Admin</div>
+          <div className="text-xs uppercase tracking-[0.22em] text-black/55">
+            Admin
+          </div>
           <h1 className="mt-2 text-2xl font-semibold">Вход</h1>
           <p className="mt-2 text-sm text-black/60">
             Введите логин и пароль администратора.
@@ -85,7 +84,8 @@ export default function AdminLoginClient() {
         </form>
 
         <div className="mt-4 text-xs text-black/50">
-          После входа откроется: <span className="font-mono">{nextPath}</span>
+          После входа откроется:{" "}
+          <span className="font-mono">{nextPath}</span>
         </div>
       </div>
     </main>
