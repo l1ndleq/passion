@@ -5,22 +5,28 @@ const redis = new Redis({
   token: process.env.UPSTASH_REDIS_REST_TOKEN!,
 });
 
-type RateLimitOpts = {
-  key: string;         // например ip:1.2.3.4 или phone:7999...
-  limit: number;       // максимум попыток
-  windowSec: number;   // окно в секундах
+type RateLimitOptions = {
+  key: string;
+  limit: number;
+  windowSec: number;
 };
 
-export async function rateLimit({ key, limit, windowSec }: RateLimitOpts) {
+export async function rateLimit({ key, limit, windowSec }: RateLimitOptions) {
   const redisKey = `rl:${key}:${windowSec}`;
 
-  const n = await redis.incr(redisKey);
-  if (n === 1) {
+  const count = await redis.incr(redisKey);
+
+  if (count === 1) {
     await redis.expire(redisKey, windowSec);
   }
 
-  const allowed = n <= limit;
-  const remaining = Math.max(0, limit - n);
+  const allowed = count <= limit;
 
-  return { allowed, remaining, used: n, limit, windowSec };
+  return {
+    allowed,
+    remaining: Math.max(0, limit - count),
+    used: count,
+    limit,
+    windowSec,
+  };
 }

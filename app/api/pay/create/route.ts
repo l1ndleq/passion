@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { Redis } from "@upstash/redis";
+import { rateLimit } from "../../../../src/lib/rateLimit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -317,6 +318,24 @@ function formatUserOrderText(order: { orderId: string; totalPrice: number }) {
 /** ===== Route ===== */
 export async function POST(req: Request) {
   try {
+    // ===== RATE LIMIT =====
+const ip =
+  req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+  "unknown";
+
+const rl = await rateLimit({
+  key: `create_order:${ip}`,
+  limit: 20,      // максимум 20 заказов
+  windowSec: 300, // за 5 минут
+});
+
+if (!rl.allowed) {
+  return NextResponse.json(
+    { ok: false, error: "TOO_MANY_REQUESTS" },
+    { status: 429 }
+  );
+}
+
     const body = (await req.json()) as CreatePayBody;
 
     const totalPrice = Number(body?.totalPrice ?? 0);
