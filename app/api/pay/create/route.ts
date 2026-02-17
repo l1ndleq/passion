@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { Redis } from "@upstash/redis";
+
 import { rateLimit } from "../../../../src/lib/rateLimit";
 import { PRODUCTS } from "../../../lib/products";
-
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -46,7 +46,7 @@ type CreatePayBody = {
     qty?: number;
     image?: string;
   }>;
-  totalPrice?: number;
+  totalPrice?: number; // игнорируем, считаем сами
   delivery?: Delivery | null;
 };
 
@@ -209,9 +209,12 @@ function normalizeDelivery(input: any): Delivery | null {
     .toLowerCase();
 
   const price = input.price == null ? undefined : Number(input.price);
-  const period_min = input.period_min == null ? undefined : Number(input.period_min);
-  const period_max = input.period_max == null ? undefined : Number(input.period_max);
-  const tariff_code = input.tariff_code == null ? undefined : Number(input.tariff_code);
+  const period_min =
+    input.period_min == null ? undefined : Number(input.period_min);
+  const period_max =
+    input.period_max == null ? undefined : Number(input.period_max);
+  const tariff_code =
+    input.tariff_code == null ? undefined : Number(input.tariff_code);
 
   const pvz = input.pvz || input.point || {};
   const pvzCode = pvz?.code ? String(pvz.code) : undefined;
@@ -276,7 +279,9 @@ function formatAdminOrderText(order: {
 
   lines.push(`<b>Имя:</b> ${name}`);
   lines.push(`<b>Телефон:</b> ${phone}`);
-  lines.push(`<b>Telegram:</b> ${tg ? `@${escapeHtml(tg.replace(/^@/, ""))}` : "—"}`);
+  lines.push(
+    `<b>Telegram:</b> ${tg ? `@${escapeHtml(tg.replace(/^@/, ""))}` : "—"}`
+  );
 
   if (city) lines.push(`<b>Город:</b> ${city}`);
   if (address) lines.push(`<b>Адрес:</b> ${address}`);
@@ -285,14 +290,23 @@ function formatAdminOrderText(order: {
   if (order.delivery) {
     const d = order.delivery;
     lines.push("");
-    lines.push(`<b>🚚 Доставка:</b> ${escapeHtml((d.provider || "cdek").toUpperCase())}`);
+    lines.push(
+      `<b>🚚 Доставка:</b> ${escapeHtml((d.provider || "cdek").toUpperCase())}`
+    );
 
     const typeLabel =
-      d.type === "pvz" ? "ПВЗ" : d.type === "door" ? "До двери" : d.type ? d.type : "";
+      d.type === "pvz"
+        ? "ПВЗ"
+        : d.type === "door"
+        ? "До двери"
+        : d.type
+        ? d.type
+        : "";
     if (typeLabel) lines.push(`<b>Тип:</b> ${escapeHtml(typeLabel)}`);
 
     if (d.pvz?.address) lines.push(`<b>ПВЗ:</b> ${escapeHtml(d.pvz.address)}`);
-    if (d.pvz?.code) lines.push(`<b>Код ПВЗ:</b> <code>${escapeHtml(d.pvz.code)}</code>`);
+    if (d.pvz?.code)
+      lines.push(`<b>Код ПВЗ:</b> <code>${escapeHtml(d.pvz.code)}</code>`);
   }
 
   lines.push("");
@@ -321,96 +335,121 @@ function formatUserOrderText(order: { orderId: string; totalPrice: number }) {
 export async function POST(req: Request) {
   try {
     // ===== RATE LIMIT =====
-const ip =
-  req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-  "unknown";
+    const ip =
+      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
 
-const rl = await rateLimit({
-  key: `create_order:${ip}`,
-  limit: 20,      // максимум 20 заказов
-  windowSec: 300, // за 5 минут
-});
-  }
-if (!rl.allowed) {
-  return NextResponse.json(
-    { ok: false, error: "TOO_MANY_REQUESTS" },
-    { status: 429 }
-  );
-}
+    const rl = await rateLimit({
+      key: `create_order:${ip}`,
+      limit: 20,
+      windowSec: 300,
+    });
+
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { ok: false, error: "TOO_MANY_REQUESTS" },
+        { status: 429 }
+      );
+    }
 
     const body = (await req.json()) as CreatePayBody;
 
-const incomingItems = Array.isArray(body?.items) ? body.items : [];
-if (incomingItems.length === 0) {
-  return NextResponse.json({ ok: false, error: "ITEMS_REQUIRED" }, { status: 400 });
-}
+    // ===== SERVER RECALC ITEMS + TOTAL =====
+    const incomingItems = Array.isArray(body?.items) ? body.items : [];
+    if (incomingItems.length === 0) {
+      return NextResponse.json(
+        { ok: false, error: "ITEMS_REQUIRED" },
+        { status: 400 }
+      );
+    }
 
-// 1) нормализуем вход (берём только id и qty)
-const normalized = incomingItems.map((it) => {
-  const id = String(it?.id ?? "").trim();
-  const qty = Number(it?.qty ?? 1);
-  return { id, qty };
-});
+    const normalized = incomingItems.map((it) => {
+      const id = String(it?.id ?? "").trim();
+      const qty = Number(it?.qty ?? 1);
+      return { id, qty };
+    });
 
-for (const it of normalized) {
-  if (!it.id) {
-    return NextResponse.json({ ok: false, error: "ITEM_ID_REQUIRED" }, { status: 400 });
-  }
-  if (!Number.isFinite(it.qty) || it.qty <= 0 || it.qty > 99 || !Number.isInteger(it.qty)) {
-    return NextResponse.json({ ok: false, error: "QTY_INVALID" }, { status: 400 });
-  }
-}
+    for (const it of normalized) {
+      if (!it.id) {
+        return NextResponse.json(
+          { ok: false, error: "ITEM_ID_REQUIRED" },
+          { status: 400 }
+        );
+      }
+      if (
+        !Number.isFinite(it.qty) ||
+        it.qty <= 0 ||
+        it.qty > 99 ||
+        !Number.isInteger(it.qty)
+      ) {
+        return NextResponse.json(
+          { ok: false, error: "QTY_INVALID" },
+          { status: 400 }
+        );
+      }
+    }
 
-// 2) собираем “серверные” items из PRODUCTS
-const serverItems = normalized.map(({ id, qty }) => {
-  const p =
-    PRODUCTS.find((x: any) => x.id === id) ||
-    PRODUCTS.find((x: any) => x.slug === id);
+    const serverItems = normalized.map(({ id, qty }) => {
+      const p =
+        (PRODUCTS as any[]).find((x: any) => x.id === id) ||
+        (PRODUCTS as any[]).find((x: any) => x.slug === id);
 
-  if (!p) {
-    // неизвестный товар — стоп, иначе можно подсунуть что угодно
-    throw new Error(`UNKNOWN_ITEM:${id}`);
-  }
+      if (!p) throw new Error(`UNKNOWN_ITEM:${id}`);
 
-  const price = Number((p as any).price ?? (p as any).priceRub ?? (p as any).amount ?? 0);
-  if (!Number.isFinite(price) || price <= 0) {
-    throw new Error(`INVALID_PRICE:${id}`);
-  }
+      const price = Number(
+        (p as any).price ?? (p as any).priceRub ?? (p as any).amount ?? 0
+      );
+      if (!Number.isFinite(price) || price <= 0) {
+        throw new Error(`INVALID_PRICE:${id}`);
+      }
 
-  return {
-    id,
-    title: String((p as any).name ?? (p as any).title ?? id),
-    price,
-    qty,
-    image: (p as any).image ?? (p as any).images?.[0] ?? undefined,
-  };
-});
+      return {
+        id,
+        title: String((p as any).name ?? (p as any).title ?? id),
+        price,
+        qty,
+        image: (p as any).image ?? (p as any).images?.[0] ?? undefined,
+      };
+    });
 
-// 3) считаем сумму на сервере
-const totalPrice = serverItems.reduce((sum, it) => sum + it.price * it.qty, 0);
-if (!Number.isFinite(totalPrice) || totalPrice <= 0) {
-  return NextResponse.json({ ok: false, error: "TOTAL_INVALID" }, { status: 400 });
-}
+    const totalPrice = serverItems.reduce((sum, it) => sum + it.price * it.qty, 0);
+    if (!Number.isFinite(totalPrice) || totalPrice <= 0) {
+      return NextResponse.json(
+        { ok: false, error: "TOTAL_INVALID" },
+        { status: 400 }
+      );
+    }
 
-// ⚠️ ВАЖНО: дальше по коду используй serverItems вместо body.items
-const items = serverItems;
+    const items = serverItems;
 
-
+    // ===== CUSTOMER VALIDATION =====
     const customer = body.customer ?? {};
     const name = String(customer.name ?? "").trim();
     const phoneRaw = String(customer.phone ?? "").trim();
 
-    if (!name) return NextResponse.json({ ok: false, error: "NAME_REQUIRED" }, { status: 400 });
-    if (!phoneRaw) return NextResponse.json({ ok: false, error: "PHONE_REQUIRED" }, { status: 400 });
-    if (!isValidPhone(phoneRaw)) return NextResponse.json({ ok: false, error: "PHONE_INVALID" }, { status: 400 });
+    if (!name)
+      return NextResponse.json(
+        { ok: false, error: "NAME_REQUIRED" },
+        { status: 400 }
+      );
+    if (!phoneRaw)
+      return NextResponse.json(
+        { ok: false, error: "PHONE_REQUIRED" },
+        { status: 400 }
+      );
+    if (!isValidPhone(phoneRaw))
+      return NextResponse.json(
+        { ok: false, error: "PHONE_INVALID" },
+        { status: 400 }
+      );
 
     const phone = normalizePhone(phoneRaw);
     const digits = phoneDigits(phone);
 
-    const telegramRaw = customer.telegram == null ? "" : String(customer.telegram).trim();
+    const telegramRaw =
+      customer.telegram == null ? "" : String(customer.telegram).trim();
     const telegram = telegramRaw.replace(/^@/, "");
 
-    const delivery = normalizeDelivery(body.delivery); // ✅ опционально
+    const delivery = normalizeDelivery(body.delivery);
 
     const mergedCustomer = {
       ...customer,
@@ -430,7 +469,9 @@ const items = serverItems;
       status: "pending_payment" as const,
       createdAt: Date.now(),
       updatedAt: Date.now(),
-      statusHistory: [{ status: "pending_payment", at: Date.now(), by: "system" as const }],
+      statusHistory: [
+        { status: "pending_payment", at: Date.now(), by: "system" as const },
+      ],
       customer: mergedCustomer,
       items,
       totalPrice,
@@ -460,7 +501,8 @@ const items = serverItems;
     await redis.lpush(`user:orders:${digits}`, orderId);
     await redis.ltrim(`user:orders:${digits}`, 0, 199);
 
-    const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/+$/, "");
+    const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000")
+      .replace(/\/+$/, "");
     const adminOrderUrl = `${siteUrl}/admin/orders/${orderId}`;
     const userOrderUrl = `${siteUrl}/order/${orderId}`;
 
@@ -468,7 +510,10 @@ const items = serverItems;
     const adminAlready = await redis.get(adminNotifyKey);
 
     if (!adminAlready) {
-      const sent = await sendAdminTelegram({ text: formatAdminOrderText(order), orderUrl: adminOrderUrl });
+      const sent = await sendAdminTelegram({
+        text: formatAdminOrderText(order),
+        orderUrl: adminOrderUrl,
+      });
       if (sent) await redis.set(adminNotifyKey, 1, { ex: ORDER_TTL_SECONDS });
     }
 
@@ -489,28 +534,28 @@ const items = serverItems;
 
     const paymentUrl = `${siteUrl}/order/${orderId}`;
     return NextResponse.json({ ok: true, orderId, paymentUrl });
-  }  catch (e: any) {
-  const message = String(e?.message || "");
+  } catch (e: any) {
+    const message = String(e?.message || "");
 
-  if (message.startsWith("UNKNOWN_ITEM:")) {
-    return NextResponse.json(
-      { ok: false, error: "UNKNOWN_ITEM" },
-      { status: 400 }
-    );
-  }
+    if (message.startsWith("UNKNOWN_ITEM:")) {
+      return NextResponse.json(
+        { ok: false, error: "UNKNOWN_ITEM" },
+        { status: 400 }
+      );
+    }
 
-  if (message.startsWith("INVALID_PRICE:")) {
+    if (message.startsWith("INVALID_PRICE:")) {
+      return NextResponse.json(
+        { ok: false, error: "INVALID_PRICE" },
+        { status: 500 }
+      );
+    }
+
+    console.error("PAY CREATE ERROR:", message, e);
+
     return NextResponse.json(
-      { ok: false, error: "INVALID_PRICE" },
+      { ok: false, error: "PAY_CREATE_FAILED" },
       { status: 500 }
     );
   }
-
-  console.error("PAY CREATE ERROR:", message, e);
-
-  return NextResponse.json(
-    { ok: false, error: "PAY_CREATE_FAILED" },
-    { status: 500 }
-  );
 }
-
