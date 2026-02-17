@@ -2,8 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import crypto from "crypto";
 
-export const runtime = "nodejs";
-
+// Next 16: "middleware" переименован в "proxy"
 export const config = {
   matcher: ["/admin/:path*", "/api/admin/:path*"],
 };
@@ -16,7 +15,7 @@ function redirectToLogin(req: NextRequest) {
   const url = req.nextUrl.clone();
   url.pathname = "/admin/login";
 
-  // для страниц добавляем next
+  // чтобы после входа вернуть на нужную страницу
   if (!req.nextUrl.pathname.startsWith("/api/")) {
     url.searchParams.set("next", req.nextUrl.pathname);
   }
@@ -25,31 +24,24 @@ function redirectToLogin(req: NextRequest) {
 }
 
 function unauthorizedJson() {
-  return NextResponse.json(
-    { ok: false, error: "UNAUTHORIZED" },
-    { status: 401 }
-  );
+  return NextResponse.json({ ok: false, error: "UNAUTHORIZED" }, { status: 401 });
 }
 
-export function middleware(req: NextRequest) {
+// Важно: экспорт должен быть либо default, либо named `proxy`
+export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   const isAdminPage = pathname.startsWith("/admin");
   const isAdminApi = pathname.startsWith("/api/admin");
+  if (!(isAdminPage || isAdminApi)) return NextResponse.next();
 
-  if (!(isAdminPage || isAdminApi)) {
-    return NextResponse.next();
-  }
-
-  // Разрешаем логин/logout без сессии
+  // Публичные маршруты (без сессии)
   const isPublic =
     pathname === "/admin/login" ||
     pathname.startsWith("/api/admin/login") ||
     pathname.startsWith("/api/admin/logout");
 
-  if (isPublic) {
-    return NextResponse.next();
-  }
+  if (isPublic) return NextResponse.next();
 
   const secret = process.env.ADMIN_SESSION_SECRET;
   if (!secret) {
@@ -62,18 +54,13 @@ export function middleware(req: NextRequest) {
   }
 
   // token format: payload.sig
-  const dotIndex = token.lastIndexOf(".");
-  if (dotIndex <= 0) {
+  const dot = token.lastIndexOf(".");
+  if (dot <= 0) {
     return isAdminApi ? unauthorizedJson() : redirectToLogin(req);
   }
 
-  const payload = token.slice(0, dotIndex);
-  const sig = token.slice(dotIndex + 1);
-
-  const expectedSig = sign(payload, secret);
-  if (expectedSig !== sig) {
-    return isAdminApi ? unauthorizedJson() : redirectToLogin(req);
-  }
+  const payload = token.slice(0, dot);
+  const sig = token.slice(dot + 1);
 
   // payload format: login|exp|nonce
   const parts = payload.split("|");
@@ -81,10 +68,15 @@ export function middleware(req: NextRequest) {
     return isAdminApi ? unauthorizedJson() : redirectToLogin(req);
   }
 
-  const [login, expStr] = parts;
+  const [, expStr] = parts;
   const exp = Number(expStr);
 
-  if (!login || !Number.isFinite(exp) || exp <= Date.now()) {
+  if (!Number.isFinite(exp) || exp <= Date.now()) {
+    return isAdminApi ? unauthorizedJson() : redirectToLogin(req);
+  }
+
+  const expected = sign(payload, secret);
+  if (expected !== sig) {
     return isAdminApi ? unauthorizedJson() : redirectToLogin(req);
   }
 
