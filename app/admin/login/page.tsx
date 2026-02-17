@@ -1,7 +1,11 @@
 "use client";
 
+export const dynamic = "force-dynamic";
+
+
 import { useMemo, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+
 
 export default function AdminLoginPage() {
   const sp = useSearchParams();
