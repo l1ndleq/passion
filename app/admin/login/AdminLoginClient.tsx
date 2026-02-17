@@ -11,33 +11,51 @@ export default function AdminLoginClient({ nextPath }: { nextPath: string }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setPending(true);
-    setError(null);
+async function onSubmit(e: React.FormEvent) {
+  e.preventDefault();
+  setPending(true);
+  setError(null);
 
+  try {
+    const r = await fetch("/api/admin/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ login, password, next: nextPath }),
+    });
+
+    const text = await r.text();
+    let j: any = null;
     try {
-      const r = await fetch("/api/admin/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ login, password, next: nextPath }),
-      });
-
-      const j = await r.json().catch(() => null);
-
-      if (!r.ok || !j?.ok) {
-        setError("Неверный логин или пароль");
-        setPending(false);
-        return;
-      }
-
-      router.replace(j.next || nextPath);
-      router.refresh();
+      j = JSON.parse(text);
     } catch {
-      setError("Ошибка сети");
-      setPending(false);
+      // не JSON
     }
+
+    if (!r.ok) {
+      setError(j?.error ? `Ошибка: ${j.error}` : `Ошибка ${r.status}`);
+      setPending(false);
+      return;
+    }
+
+    if (!j?.ok) {
+      // если сервер вернул не JSON, покажем кусок ответа
+      setError(
+        j?.error
+          ? `Ошибка: ${j.error}`
+          : `Сервер вернул не JSON: ${text.slice(0, 120)}`
+      );
+      setPending(false);
+      return;
+    }
+
+    router.replace(j.next || nextPath);
+    router.refresh();
+  } catch (err: any) {
+    setError(`Ошибка сети: ${err?.message || "unknown"}`);
+    setPending(false);
   }
+}
+
 
   return (
     <main className="min-h-[70vh] flex items-center justify-center px-5 py-14">
