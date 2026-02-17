@@ -12,17 +12,29 @@ function sign(payload: string, secret: string) {
   return crypto.createHmac("sha256", secret).update(payload).digest("hex");
 }
 
+function parseUsers(raw: string) {
+  return raw
+    .split(",")
+    .map((u) => u.trim())
+    .filter(Boolean)
+    .map((pair) => {
+      const [login, password] = pair.split(":");
+      return { login, password };
+    });
+}
+
 export async function POST(req: Request) {
-  const adminLogin = process.env.ADMIN_LOGIN || "admin";
-  const adminPassword = process.env.ADMIN_PASSWORD || "";
+  const rawUsers = process.env.ADMIN_USERS || "";
   const secret = process.env.ADMIN_SESSION_SECRET || "";
 
-  if (!adminPassword || !secret) {
+  if (!rawUsers || !secret) {
     return NextResponse.json(
       { ok: false, error: "ADMIN_ENV_MISSING" },
       { status: 500 }
     );
   }
+
+  const users = parseUsers(rawUsers);
 
   let body: any;
   try {
@@ -35,18 +47,23 @@ export async function POST(req: Request) {
   const password = String(body?.password ?? "");
   const next = typeof body?.next === "string" ? body.next : "/admin/orders";
 
-  // сравнение без утечек по времени
-  const okLogin = timingSafeEqual(login, adminLogin);
-  const okPass = timingSafeEqual(password, adminPassword);
+  const matched = users.find(
+    (u) =>
+      timingSafeEqual(login, u.login) &&
+      timingSafeEqual(password, u.password)
+  );
 
-  if (!okLogin || !okPass) {
-    return NextResponse.json({ ok: false, error: "INVALID_CREDENTIALS" }, { status: 401 });
+  if (!matched) {
+    return NextResponse.json(
+      { ok: false, error: "INVALID_CREDENTIALS" },
+      { status: 401 }
+    );
   }
 
-  // Сессия: payload = login|exp|nonce, signature = HMAC(secret)
-  const exp = Date.now() + 1000 * 60 * 60 * 24 * 7; // 7 дней
+  // Сессия
+  const exp = Date.now() + 1000 * 60 * 60 * 24 * 7;
   const nonce = crypto.randomBytes(16).toString("hex");
-  const payload = `${adminLogin}|${exp}|${nonce}`;
+  const payload = `${login}|${exp}|${nonce}`;
   const sig = sign(payload, secret);
   const token = `${payload}.${sig}`;
 
@@ -55,7 +72,7 @@ export async function POST(req: Request) {
   res.cookies.set("admin_session", token, {
     httpOnly: true,
     sameSite: "lax",
-    secure: true, // Vercel https
+    secure: true,
     path: "/",
     expires: new Date(exp),
   });
