@@ -330,7 +330,7 @@ const rl = await rateLimit({
   limit: 20,      // максимум 20 заказов
   windowSec: 300, // за 5 минут
 });
-
+  }
 if (!rl.allowed) {
   return NextResponse.json(
     { ok: false, error: "TOO_MANY_REQUESTS" },
