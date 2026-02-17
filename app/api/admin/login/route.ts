@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import crypto from "crypto";
-import { rateLimit } from "../../../lib/rateLimit";
+import { rateLimit } from "../../../../src/lib/rateLimit";
+
+
+
+
 
 function timingSafeEqual(a: string, b: string) {
   const aBuf = Buffer.from(a);
