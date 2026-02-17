@@ -1,34 +1,58 @@
 import { NextResponse } from "next/server";
-import { Redis } from "@upstash/redis";
 import { z } from "zod";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 const CreatePaySchema = z.object({
-  customer: z.object({
-    name: z.string().trim().min(1).max(60).optional(),
-    phone: z.string().trim().min(6).max(20).optional(),
-    city: z.string().trim().max(60).optional(),
-    address: z.string().trim().max(200).optional(),
-    message: z.string().trim().max(500).optional(),
-  }).optional(),
-  items: z.array(z.object({
-    id: z.string().trim().min(1).max(80),
-    title: z.string().trim().min(1).max(120).optional(),
-    price: z.number().nonnegative().optional(),
-    qty: z.number().int().positive().max(99).optional(),
-    image: z.string().trim().max(500).optional(),
-  })).optional(),
+  customer: z
+    .object({
+      name: z.string().trim().min(1).max(60).optional(),
+      phone: z.string().trim().min(6).max(20).optional(),
+      telegram: z.string().trim().max(64).nullable().optional(),
+      city: z.string().trim().max(60).optional(),
+      address: z.string().trim().max(200).optional(),
+      message: z.string().trim().max(500).optional(),
+    })
+    .optional(),
+  items: z
+    .array(
+      z.object({
+        id: z.string().trim().min(1).max(80),
+        title: z.string().trim().min(1).max(120).optional(),
+        price: z.number().nonnegative().optional(),
+        qty: z.number().int().positive().max(99).optional(),
+        image: z.string().trim().max(500).optional(),
+      })
+    )
+    .optional(),
   totalPrice: z.number().nonnegative().optional(),
 });
 
-const raw = await req.json();
-const parsed = CreatePaySchema.safeParse(raw);
-if (!parsed.success) {
-  return NextResponse.json(
-    { ok: false, error: "INVALID_BODY", issues: parsed.error.issues },
-    { status: 400 }
-  );
-}
-const body = parsed.data;
+export async function POST(req: Request) {
+  let raw: unknown;
+
+  try {
+    raw = await req.json();
+  } catch {
+    return NextResponse.json(
+      { ok: false, error: "INVALID_JSON" },
+      { status: 400 }
+    );
+  }
+
+  const parsed = CreatePaySchema.safeParse(raw);
+
+  if (!parsed.success) {
+    return NextResponse.json(
+      { ok: false, error: "INVALID_BODY", issues: parsed.error.issues },
+      { status: 400 }
+    );
+  }
+
+  const body = parsed.data;
+
+  // TODO: дальше твоя логика создания оплаты/заказа
 
 
 export const runtime = "nodejs";
@@ -442,5 +466,5 @@ export async function POST(req: Request) {
 }
 
 export async function GET() {
-  return NextResponse.json({ ok: false, error: "Method Not Allowed" }, { status: 405 });
+  return NextResponse.json({ ok: true, received: body });
 }
