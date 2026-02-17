@@ -1,59 +1,5 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
-
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-
-const CreatePaySchema = z.object({
-  customer: z
-    .object({
-      name: z.string().trim().min(1).max(60).optional(),
-      phone: z.string().trim().min(6).max(20).optional(),
-      telegram: z.string().trim().max(64).nullable().optional(),
-      city: z.string().trim().max(60).optional(),
-      address: z.string().trim().max(200).optional(),
-      message: z.string().trim().max(500).optional(),
-    })
-    .optional(),
-  items: z
-    .array(
-      z.object({
-        id: z.string().trim().min(1).max(80),
-        title: z.string().trim().min(1).max(120).optional(),
-        price: z.number().nonnegative().optional(),
-        qty: z.number().int().positive().max(99).optional(),
-        image: z.string().trim().max(500).optional(),
-      })
-    )
-    .optional(),
-  totalPrice: z.number().nonnegative().optional(),
-});
-
-export async function POST(req: Request) {
-  let raw: unknown;
-
-  try {
-    raw = await req.json();
-  } catch {
-    return NextResponse.json(
-      { ok: false, error: "INVALID_JSON" },
-      { status: 400 }
-    );
-  }
-
-  const parsed = CreatePaySchema.safeParse(raw);
-
-  if (!parsed.success) {
-    return NextResponse.json(
-      { ok: false, error: "INVALID_BODY", issues: parsed.error.issues },
-      { status: 400 }
-    );
-  }
-
-  const body = parsed.data;
-
-  // TODO: дальше твоя логика создания оплаты/заказа
-
+import { Redis } from "@upstash/redis";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -106,7 +52,9 @@ function getRedisOrThrow() {
   const token = process.env.UPSTASH_REDIS_REST_TOKEN;
 
   if (!url || !token) {
-    throw new Error("Upstash env missing: UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN");
+    throw new Error(
+      "Upstash env missing: UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN"
+    );
   }
 
   return new Redis({ url, token });
@@ -156,7 +104,13 @@ function getAdminChatIds() {
     .filter(Boolean);
 }
 
-async function sendAdminTelegram({ text, orderUrl }: { text: string; orderUrl: string }) {
+async function sendAdminTelegram({
+  text,
+  orderUrl,
+}: {
+  text: string;
+  orderUrl: string;
+}) {
   const token = process.env.TELEGRAM_ADMIN_BOT_TOKEN;
   const chatIds = getAdminChatIds();
 
@@ -192,7 +146,12 @@ async function sendAdminTelegram({ text, orderUrl }: { text: string; orderUrl: s
       const j = await r.json().catch(() => null);
 
       if (r.ok && j?.ok) okCount += 1;
-      else console.error("Admin Telegram send failed:", { chat_id, status: r.status, resp: j });
+      else
+        console.error("Admin Telegram send failed:", {
+          chat_id,
+          status: r.status,
+          resp: j,
+        });
     })
   );
 
@@ -230,7 +189,11 @@ async function sendUserTelegram({
 
   const j = await r.json().catch(() => null);
   if (!r.ok || !j?.ok) {
-    console.error("User Telegram send failed:", { chatId, status: r.status, resp: j });
+    console.error("User Telegram send failed:", {
+      chatId,
+      status: r.status,
+      resp: j,
+    });
   }
 }
 
@@ -238,7 +201,9 @@ function normalizeDelivery(input: any): Delivery | null {
   if (!input) return null;
 
   const provider = String(input.provider || "cdek").trim().toLowerCase();
-  const type = String(input.type || input.delivery?.type || "").trim().toLowerCase();
+  const type = String(input.type || input.delivery?.type || "")
+    .trim()
+    .toLowerCase();
 
   const price = input.price == null ? undefined : Number(input.price);
   const period_min = input.period_min == null ? undefined : Number(input.period_min);
@@ -380,7 +345,6 @@ export async function POST(req: Request) {
 
     const delivery = normalizeDelivery(body.delivery); // ✅ опционально
 
-    // ✅ если выбрали ПВЗ, а адрес не заполнили — подставим ПВЗ в customer.address
     const mergedCustomer = {
       ...customer,
       name,
@@ -403,7 +367,7 @@ export async function POST(req: Request) {
       customer: mergedCustomer,
       items,
       totalPrice,
-      delivery, // может быть null
+      delivery,
     };
 
     const redis = getRedisOrThrow();
@@ -463,8 +427,4 @@ export async function POST(req: Request) {
     console.error("PAY CREATE ERROR:", message, e);
     return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }
-}
-
-export async function GET() {
-  return NextResponse.json({ ok: true, received: body });
 }
