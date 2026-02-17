@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { Redis } from "@upstash/redis";
 import { rateLimit } from "../../../../src/lib/rateLimit";
+import { PRODUCTS } from "../../../lib/products";
+
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -338,15 +340,61 @@ if (!rl.allowed) {
 
     const body = (await req.json()) as CreatePayBody;
 
-    const totalPrice = Number(body?.totalPrice ?? 0);
-    if (!Number.isFinite(totalPrice) || totalPrice <= 0) {
-      return NextResponse.json({ ok: false, error: "TOTAL_INVALID" }, { status: 400 });
-    }
+const incomingItems = Array.isArray(body?.items) ? body.items : [];
+if (incomingItems.length === 0) {
+  return NextResponse.json({ ok: false, error: "ITEMS_REQUIRED" }, { status: 400 });
+}
 
-    const items = Array.isArray(body?.items) ? body.items : [];
-    if (items.length === 0) {
-      return NextResponse.json({ ok: false, error: "ITEMS_REQUIRED" }, { status: 400 });
-    }
+// 1) нормализуем вход (берём только id и qty)
+const normalized = incomingItems.map((it) => {
+  const id = String(it?.id ?? "").trim();
+  const qty = Number(it?.qty ?? 1);
+  return { id, qty };
+});
+
+for (const it of normalized) {
+  if (!it.id) {
+    return NextResponse.json({ ok: false, error: "ITEM_ID_REQUIRED" }, { status: 400 });
+  }
+  if (!Number.isFinite(it.qty) || it.qty <= 0 || it.qty > 99 || !Number.isInteger(it.qty)) {
+    return NextResponse.json({ ok: false, error: "QTY_INVALID" }, { status: 400 });
+  }
+}
+
+// 2) собираем “серверные” items из PRODUCTS
+const serverItems = normalized.map(({ id, qty }) => {
+  const p =
+    PRODUCTS.find((x: any) => x.id === id) ||
+    PRODUCTS.find((x: any) => x.slug === id);
+
+  if (!p) {
+    // неизвестный товар — стоп, иначе можно подсунуть что угодно
+    throw new Error(`UNKNOWN_ITEM:${id}`);
+  }
+
+  const price = Number((p as any).price ?? (p as any).priceRub ?? (p as any).amount ?? 0);
+  if (!Number.isFinite(price) || price <= 0) {
+    throw new Error(`INVALID_PRICE:${id}`);
+  }
+
+  return {
+    id,
+    title: String((p as any).name ?? (p as any).title ?? id),
+    price,
+    qty,
+    image: (p as any).image ?? (p as any).images?.[0] ?? undefined,
+  };
+});
+
+// 3) считаем сумму на сервере
+const totalPrice = serverItems.reduce((sum, it) => sum + it.price * it.qty, 0);
+if (!Number.isFinite(totalPrice) || totalPrice <= 0) {
+  return NextResponse.json({ ok: false, error: "TOTAL_INVALID" }, { status: 400 });
+}
+
+// ⚠️ ВАЖНО: дальше по коду используй serverItems вместо body.items
+const items = serverItems;
+
 
     const customer = body.customer ?? {};
     const name = String(customer.name ?? "").trim();
@@ -441,9 +489,28 @@ if (!rl.allowed) {
 
     const paymentUrl = `${siteUrl}/order/${orderId}`;
     return NextResponse.json({ ok: true, orderId, paymentUrl });
-  } catch (e: any) {
-    const message = e?.message || "PAY_CREATE_FAILED";
-    console.error("PAY CREATE ERROR:", message, e);
-    return NextResponse.json({ ok: false, error: message }, { status: 500 });
+  }  catch (e: any) {
+  const message = String(e?.message || "");
+
+  if (message.startsWith("UNKNOWN_ITEM:")) {
+    return NextResponse.json(
+      { ok: false, error: "UNKNOWN_ITEM" },
+      { status: 400 }
+    );
   }
+
+  if (message.startsWith("INVALID_PRICE:")) {
+    return NextResponse.json(
+      { ok: false, error: "INVALID_PRICE" },
+      { status: 500 }
+    );
+  }
+
+  console.error("PAY CREATE ERROR:", message, e);
+
+  return NextResponse.json(
+    { ok: false, error: "PAY_CREATE_FAILED" },
+    { status: 500 }
+  );
 }
+
