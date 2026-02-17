@@ -1,70 +1,92 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useMemo, useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 
 export default function AdminLoginPage() {
+  const sp = useSearchParams();
   const router = useRouter();
+
+  const nextPath = useMemo(() => sp.get("next") || "/admin/orders", [sp]);
+
+  const [login, setLogin] = useState("");
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setLoading(true);
+    setPending(true);
     setError(null);
 
     try {
-      const res = await fetch("/api/admin/login", {
+      const r = await fetch("/api/admin/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({ login, password, next: nextPath }),
       });
 
-      const data = await res.json().catch(() => null);
+      const j = await r.json().catch(() => null);
 
-      if (!res.ok || !data?.ok) {
-        setError(data?.error === "INVALID_PASSWORD" ? "Неверный пароль" : "Ошибка входа");
+      if (!r.ok || !j?.ok) {
+        setError("Неверный логин или пароль");
+        setPending(false);
         return;
       }
 
-      router.replace("/admin/orders");
+      router.replace(j.next || nextPath);
+      router.refresh();
     } catch {
-      setError("Ошибка входа");
-    } finally {
-      setLoading(false);
+      setError("Ошибка сети");
+      setPending(false);
     }
   }
 
   return (
-    <main className="mx-auto max-w-md px-4 py-16">
-      <div className="rounded-3xl border bg-white/60 backdrop-blur p-8 shadow-sm">
-        <div className="text-[10px] tracking-[0.22em] uppercase opacity-60">
-          PASSION / ADMIN
+    <main className="min-h-[70vh] flex items-center justify-center px-5 py-14">
+      <div className="w-full max-w-sm rounded-2xl border border-black/10 bg-white p-6 shadow-sm">
+        <div className="mb-6">
+          <div className="text-xs uppercase tracking-[0.22em] text-black/55">Admin</div>
+          <h1 className="mt-2 text-2xl font-semibold">Вход</h1>
+          <p className="mt-2 text-sm text-black/60">
+            Введите логин и пароль администратора.
+          </p>
         </div>
 
-        <h1 className="mt-3 text-2xl font-medium tracking-tight">Вход в админку</h1>
-        <p className="mt-1 text-sm text-neutral-600">Введите пароль администратора.</p>
-
-        <form onSubmit={onSubmit} className="mt-6 space-y-3">
+        <form onSubmit={onSubmit} className="space-y-3">
           <input
+            className="w-full rounded-xl border border-black/10 px-4 py-3 text-sm outline-none focus:border-black/30"
+            placeholder="Логин"
+            value={login}
+            onChange={(e) => setLogin(e.target.value)}
+            autoComplete="username"
+          />
+          <input
+            className="w-full rounded-xl border border-black/10 px-4 py-3 text-sm outline-none focus:border-black/30"
+            placeholder="Пароль"
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder="Пароль"
-            className="w-full rounded-2xl border bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-black/10"
+            autoComplete="current-password"
           />
 
-          {error ? <div className="text-sm text-red-600">{error}</div> : null}
+          {error ? (
+            <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
+              {error}
+            </div>
+          ) : null}
 
           <button
-            disabled={loading}
-            className="w-full rounded-2xl bg-black px-5 py-3 text-sm text-white hover:opacity-90 disabled:opacity-60"
-            type="submit"
+            disabled={pending || !login || !password}
+            className="w-full rounded-xl bg-black px-4 py-3 text-sm font-medium text-white disabled:opacity-60"
           >
-            {loading ? "Вход..." : "Войти"}
+            {pending ? "Входим..." : "Войти"}
           </button>
         </form>
+
+        <div className="mt-4 text-xs text-black/50">
+          После входа откроется: <span className="font-mono">{nextPath}</span>
+        </div>
       </div>
     </main>
   );

@@ -1,65 +1,110 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-function toHex(buffer: ArrayBuffer) {
-  return [...new Uint8Array(buffer)].map((b) => b.toString(16).padStart(2, "0")).join("");
+function fromHex(hex: string) {
+  if (!/^[0-9a-f]+$/i.test(hex) || hex.length % 2 !== 0) return null;
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < bytes.length; i++) {
+    bytes[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+  }
+  return bytes;
 }
 
-async function sign(value: string, secret: string) {
+async function verifyHmac(payload: string, secret: string, sigHex: string) {
+  const sig = fromHex(sigHex);
+  if (!sig) return false;
+
   const enc = new TextEncoder();
   const key = await crypto.subtle.importKey(
     "raw",
     enc.encode(secret),
     { name: "HMAC", hash: "SHA-256" },
     false,
-    ["sign"]
+    ["verify"]
   );
 
-  const sig = await crypto.subtle.sign("HMAC", key, enc.encode(value));
-  return toHex(sig);
+  return crypto.subtle.verify("HMAC", key, sig, enc.encode(payload));
+}
+
+function redirectToLogin(req: NextRequest) {
+  const url = req.nextUrl.clone();
+  url.pathname = "/admin/login";
+
+  // сохраняем куда хотели попасть (только для страниц)
+  if (!req.nextUrl.pathname.startsWith("/api/")) {
+    url.searchParams.set("next", req.nextUrl.pathname);
+  }
+
+  return NextResponse.redirect(url);
+}
+
+function unauthorizedJson() {
+  return NextResponse.json(
+    { ok: false, error: "UNAUTHORIZED" },
+    { status: 401 }
+  );
 }
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
+  // Защищаем только /admin/* и /api/admin/*
   const isAdminPage = pathname.startsWith("/admin");
   const isAdminApi = pathname.startsWith("/api/admin");
-  const isLoginRoute = pathname === "/admin/login" || pathname === "/api/admin/login";
+  if (!(isAdminPage || isAdminApi)) return NextResponse.next();
 
-  if (!(isAdminPage || isAdminApi) || isLoginRoute) {
-    return NextResponse.next();
-  }
+  // Разрешаем без сессии:
+  // - страница логина
+  // - API логина
+  // - (опционально) logout
+  const isPublic =
+    pathname === "/admin/login" ||
+    pathname === "/api/admin/login" ||
+    pathname === "/api/admin/logout";
+  if (isPublic) return NextResponse.next();
 
-  const secret = process.env.ADMIN_COOKIE_SECRET;
+  const secret = process.env.ADMIN_SESSION_SECRET;
+  const expectedLogin = process.env.ADMIN_LOGIN || "admin";
+
   if (!secret) {
-    return NextResponse.redirect(new URL("/admin/login", req.url));
+    // если секрет не задан — считаем, что вход запрещён
+    return isAdminApi ? unauthorizedJson() : redirectToLogin(req);
   }
 
-  const cookie = req.cookies.get("admin_session")?.value;
-  if (!cookie) {
-    return NextResponse.redirect(new URL("/admin/login", req.url));
+  const token = req.cookies.get("admin_session")?.value;
+  if (!token) {
+    return isAdminApi ? unauthorizedJson() : redirectToLogin(req);
   }
 
-  // cookie format: "ts.signature"
-  const [ts, sig] = cookie.split(".");
-  if (!ts || !sig) {
-    return NextResponse.redirect(new URL("/admin/login", req.url));
+  // token = payload.sig
+  const dot = token.lastIndexOf(".");
+  if (dot <= 0) {
+    return isAdminApi ? unauthorizedJson() : redirectToLogin(req);
   }
 
-  const expected = await sign(ts, secret);
-  if (expected !== sig) {
-    return NextResponse.redirect(new URL("/admin/login", req.url));
+  const payload = token.slice(0, dot);
+  const sigHex = token.slice(dot + 1);
+
+  // payload = login|exp|nonce
+  const parts = payload.split("|");
+  if (parts.length !== 3) {
+    return isAdminApi ? unauthorizedJson() : redirectToLogin(req);
   }
 
-  // TTL 7 дней
-  const tsNum = Number(ts);
-  if (!Number.isFinite(tsNum)) {
-    return NextResponse.redirect(new URL("/admin/login", req.url));
+  const [login, expStr] = parts;
+  const exp = Number(expStr);
+
+  if (!login || login !== expectedLogin) {
+    return isAdminApi ? unauthorizedJson() : redirectToLogin(req);
   }
 
-  const maxAgeMs = 7 * 24 * 60 * 60 * 1000;
-  if (Date.now() - tsNum > maxAgeMs) {
-    return NextResponse.redirect(new URL("/admin/login", req.url));
+  if (!Number.isFinite(exp) || exp <= Date.now()) {
+    return isAdminApi ? unauthorizedJson() : redirectToLogin(req);
+  }
+
+  const ok = await verifyHmac(payload, secret, sigHex);
+  if (!ok) {
+    return isAdminApi ? unauthorizedJson() : redirectToLogin(req);
   }
 
   return NextResponse.next();
