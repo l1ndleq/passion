@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 type Profile = { name: string; phone: string; email: string };
@@ -41,6 +42,8 @@ function statusLabel(status?: string) {
 }
 
 export default function AccountClient({ phone }: { phone: string }) {
+  const router = useRouter();
+
   const [profile, setProfile] = useState<Profile>({ name: "", phone: "", email: "" });
 
   const [orders, setOrders] = useState<ServerOrder[]>([]);
@@ -49,6 +52,8 @@ export default function AccountClient({ phone }: { phone: string }) {
 
   const [tgLinked, setTgLinked] = useState<boolean | null>(null);
   const [tgError, setTgError] = useState<string | null>(null);
+  const [logoutLoading, setLogoutLoading] = useState(false);
+  const [logoutError, setLogoutError] = useState<string | null>(null);
 
   const [trackValue, setTrackValue] = useState("");
 
@@ -141,13 +146,46 @@ export default function AccountClient({ phone }: { phone: string }) {
   const normalized = normalizeOrderId(trackValue);
   const canTrack = normalized.length >= 6;
 
+  async function logout() {
+    if (logoutLoading) return;
+
+    setLogoutLoading(true);
+    setLogoutError(null);
+
+    try {
+      const res = await fetch("/api/auth/logout", { method: "POST" });
+      if (!res.ok) {
+        setLogoutError("LOGOUT_FAILED");
+        return;
+      }
+
+      router.push("/login");
+      router.refresh();
+    } catch {
+      setLogoutError("LOGOUT_FAILED");
+    } finally {
+      setLogoutLoading(false);
+    }
+  }
+
   return (
     <div className="max-w-5xl mx-auto p-6 space-y-6">
-      <div>
+      <div className="flex items-start justify-between gap-3">
+        <div>
         <div className="text-sm text-black/60">Личный кабинет</div>
         <div className="text-2xl font-semibold">Мой аккаунт</div>
         <div className="mt-1 text-xs text-black/50">Вы вошли как: {phone}</div>
+        </div>
+        <button
+          onClick={logout}
+          disabled={logoutLoading}
+          className="rounded-xl border px-3 py-2 text-sm hover:bg-white/70 disabled:opacity-50"
+          type="button"
+        >
+          {logoutLoading ? "Logging out..." : "Logout"}
+        </button>
       </div>
+      {logoutError ? <div className="text-xs text-red-600">{logoutError}</div> : null}
 
       {/* Telegram */}
       <div className="border border-black/10 rounded-2xl bg-white/40 p-4">

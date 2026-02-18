@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { Redis } from "@upstash/redis";
+import { buildOrderTrackingUrl } from "@/app/lib/orderAccess";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -88,7 +89,7 @@ export async function POST(req: Request) {
     const adminChatIds = getAdminChatIds();
 
     const site = (process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/+$/, "");
-    const orderUrl = site ? `${site}/order/${orderId}` : "";
+    const orderUrl = site ? buildOrderTrackingUrl(site, orderId, phone) : "";
 
     const sm = statusMeta(status);
 

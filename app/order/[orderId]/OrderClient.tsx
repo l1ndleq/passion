@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 
 type PublicOrder = {
   orderId: string;
@@ -57,6 +57,7 @@ function extractOrderId(pathname: string | null) {
 
 export default function OrderTrackingClient() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   const [ready, setReady] = useState(false);
   const [orderId, setOrderId] = useState<string | null>(null);
@@ -98,7 +99,10 @@ export default function OrderTrackingClient() {
     } catch {}
   }, [orderId]);
 
-  const GET_URL = orderId ? `/api/orders/${orderId}` : null;
+  const accessToken = (searchParams.get("t") || "").trim();
+  const GET_URL = orderId
+    ? `/api/orders/${orderId}${accessToken ? `?t=${encodeURIComponent(accessToken)}` : ""}`
+    : null;
 
   async function load() {
     if (!GET_URL || !orderId) return;
@@ -123,8 +127,8 @@ export default function OrderTrackingClient() {
       }
 
       setOrder(data.order as PublicOrder);
-    } catch (e: any) {
-      setError(e?.message || "Ошибка сети");
+    } catch (error: unknown) {
+      setError(error instanceof Error ? error.message : "Ошибка сети");
       setOrder(null);
     } finally {
       setLoading(false);
@@ -135,7 +139,7 @@ export default function OrderTrackingClient() {
   useEffect(() => {
     if (ready && orderId) load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, orderId]);
+  }, [ready, orderId, accessToken]);
 
   if (!ready) return null;
 

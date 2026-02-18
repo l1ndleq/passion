@@ -3,6 +3,7 @@ import { Redis } from "@upstash/redis";
 
 import { rateLimit } from "../../../../src/lib/rateLimit";
 import { PRODUCTS } from "../../../lib/products";
+import { buildOrderTrackingUrl } from "@/app/lib/orderAccess";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -504,7 +505,7 @@ export async function POST(req: Request) {
     const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000")
       .replace(/\/+$/, "");
     const adminOrderUrl = `${siteUrl}/admin/orders/${orderId}`;
-    const userOrderUrl = `${siteUrl}/order/${orderId}`;
+    const userOrderUrl = buildOrderTrackingUrl(siteUrl, orderId, phone);
 
     const adminNotifyKey = `order:${orderId}:tg_admin_created`;
     const adminAlready = await redis.get(adminNotifyKey);
@@ -532,7 +533,7 @@ export async function POST(req: Request) {
       }
     }
 
-    const paymentUrl = `${siteUrl}/order/${orderId}`;
+    const paymentUrl = userOrderUrl;
     return NextResponse.json({ ok: true, orderId, paymentUrl });
   } catch (e: any) {
     const message = String(e?.message || "");
