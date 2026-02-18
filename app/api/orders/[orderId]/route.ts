@@ -61,7 +61,9 @@ export async function GET(req: Request) {
       Boolean(orderPhoneDigits) &&
       sessionPhoneDigits === orderPhoneDigits;
 
-    const token = url.searchParams.get(ORDER_ACCESS_QUERY_PARAM);
+    const token =
+      req.headers.get("x-order-access-token") ||
+      url.searchParams.get(ORDER_ACCESS_QUERY_PARAM);
     const hasAccessToken = verifyOrderAccessToken({ orderId, phone: orderPhone, token });
 
     if (!isOwner && !hasAccessToken) {

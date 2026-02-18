@@ -58,8 +58,8 @@ export function buildOrderTrackingUrl(baseUrl: string, orderId: string, phone: s
   const token = createOrderAccessToken(orderId, phone);
   const path = `/order/${encodeURIComponent(orderId)}`;
 
-  if (!site) return token ? `${path}?${ORDER_ACCESS_QUERY_PARAM}=${token}` : path;
+  if (!site) return token ? `${path}#${ORDER_ACCESS_QUERY_PARAM}=${token}` : path;
   return token
-    ? `${site}${path}?${ORDER_ACCESS_QUERY_PARAM}=${token}`
+    ? `${site}${path}#${ORDER_ACCESS_QUERY_PARAM}=${token}`
     : `${site}${path}`;
 }

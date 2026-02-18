@@ -55,6 +55,8 @@ function extractOrderId(pathname: string | null) {
   return parts[idx + 1] ?? null;
 }
 
+const ORDER_ACCESS_TOKEN_STORAGE_PREFIX = "passion_order_access_token:";
+
 export default function OrderTrackingClient() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -65,6 +67,7 @@ export default function OrderTrackingClient() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [order, setOrder] = useState<PublicOrder | null>(null);
+  const [accessToken, setAccessToken] = useState("");
 
   // 1) достаём orderId из URL
   useEffect(() => {
@@ -99,10 +102,47 @@ export default function OrderTrackingClient() {
     } catch {}
   }, [orderId]);
 
-  const accessToken = (searchParams.get("t") || "").trim();
-  const GET_URL = orderId
-    ? `/api/orders/${orderId}${accessToken ? `?t=${encodeURIComponent(accessToken)}` : ""}`
-    : null;
+  const queryAccessToken = (searchParams.get("t") || "").trim();
+
+  useEffect(() => {
+    if (!orderId) return;
+
+    const storageKey = `${ORDER_ACCESS_TOKEN_STORAGE_PREFIX}${orderId}`;
+    let incomingToken = queryAccessToken;
+
+    const hash = window.location.hash.startsWith("#")
+      ? window.location.hash.slice(1)
+      : window.location.hash;
+    if (hash) {
+      const hashToken = new URLSearchParams(hash).get("t")?.trim() || "";
+      if (hashToken) incomingToken = hashToken;
+    }
+
+    if (incomingToken) {
+      setAccessToken(incomingToken);
+      try {
+        sessionStorage.setItem(storageKey, incomingToken);
+      } catch {}
+
+      const cleanPath = `/order/${encodeURIComponent(orderId)}`;
+      if (
+        window.location.pathname !== cleanPath ||
+        window.location.search ||
+        window.location.hash
+      ) {
+        window.history.replaceState(null, "", cleanPath);
+      }
+      return;
+    }
+
+    try {
+      setAccessToken(sessionStorage.getItem(storageKey) || "");
+    } catch {
+      setAccessToken("");
+    }
+  }, [orderId, queryAccessToken]);
+
+  const GET_URL = orderId ? `/api/orders/${orderId}` : null;
 
   async function load() {
     if (!GET_URL || !orderId) return;
@@ -111,7 +151,8 @@ export default function OrderTrackingClient() {
     setError(null);
 
     try {
-      const res = await fetch(GET_URL, { cache: "no-store" });
+      const headers = accessToken ? { "x-order-access-token": accessToken } : undefined;
+      const res = await fetch(GET_URL, { cache: "no-store", headers });
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
