@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 export default function LoginClient() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
@@ -13,6 +14,12 @@ export default function LoginClient() {
   const [loading, setLoading] = useState(false);
   const [hint, setHint] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const nextPathRaw = searchParams.get("next");
+  const nextPath =
+    nextPathRaw && nextPathRaw.startsWith("/") && !nextPathRaw.startsWith("//")
+      ? nextPathRaw
+      : "/account";
 
   async function request() {
     setLoading(true);
@@ -39,8 +46,8 @@ export default function LoginClient() {
       if (data?.devCode) setHint(`DEV-код: ${data.devCode}`);
       if (data?.channel === "telegram") setHint((prev) => prev ?? "Код отправлен в Telegram");
       if (data?.channel === "sms") setHint((prev) => prev ?? "Код отправлен по SMS");
-    } catch (e: any) {
-      setError(e?.message || "Ошибка сети");
+    } catch (error: unknown) {
+      setError(error instanceof Error ? error.message : "Ошибка сети");
     } finally {
       setLoading(false);
     }
@@ -64,10 +71,10 @@ export default function LoginClient() {
         return;
       }
 
-      router.push("/account");
+      router.push(nextPath);
       router.refresh();
-    } catch (e: any) {
-      setError(e?.message || "Ошибка сети");
+    } catch (error: unknown) {
+      setError(error instanceof Error ? error.message : "Ошибка сети");
     } finally {
       setLoading(false);
     }
