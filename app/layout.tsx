@@ -26,7 +26,7 @@ const cormorant = Cormorant_Garamond({
 
 export const metadata = {
   title: "passion",
-  description: "Passion cosmetics — minimal beauty",
+  description: "Passion — современная косметика для ежедневного ухода",
 };
 
 const NAV_LINK =

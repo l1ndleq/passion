@@ -232,7 +232,7 @@ export default function CheckoutPage() {
         return;
       }
 
-      throw new Error("Сервер не вернул paymentUrl или orderId");
+      throw new Error("Сервер не вернул ссылку на оплату или номер заказа");
     } catch (err: any) {
       setError(err?.message || "Ошибка оформления заказа");
       setSubmitting(false);
@@ -279,7 +279,7 @@ export default function CheckoutPage() {
 
             <input
               className="h-12 rounded-xl border border-neutral-200 px-4 text-sm outline-none focus:border-neutral-400"
-              placeholder="Telegram (необязательно)"
+              placeholder="Телеграм (необязательно)"
               value={form.telegram || ""}
               onChange={(e) => setField("telegram", e.target.value)}
               disabled={submitting}
@@ -289,7 +289,7 @@ export default function CheckoutPage() {
             <div className="mt-2 rounded-2xl border border-neutral-200 p-4">
               <div className="text-sm font-medium">Доставка: СДЭК (ПВЗ)</div>
               <div className="mt-1 text-xs text-neutral-500">
-                Пока без автоматического API: укажи ПВЗ, мы оформим отправку вручную.
+                Пока без автоматической интеграции: укажи ПВЗ, мы оформим отправку вручную.
               </div>
 
               <div className="mt-3 grid gap-3">

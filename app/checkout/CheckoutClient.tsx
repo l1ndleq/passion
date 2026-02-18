@@ -146,14 +146,14 @@ export default function CheckoutClient({ items, totalPrice }: CheckoutClientProp
         ) : null}
       </div>
 
-      {/* Telegram (опционально) */}
+      {/* Телеграм (опционально) */}
       <div>
-        <label className="mb-1 block text-sm text-neutral-700">Telegram (необязательно)</label>
+        <label className="mb-1 block text-sm text-neutral-700">Телеграм (необязательно)</label>
         <input
           name="telegram"
           value={form.telegram}
           onChange={onChange}
-          placeholder="@username"
+          placeholder="@ник"
           className="w-full rounded-2xl border bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-black/10"
         />
         <p className="mt-1 text-xs text-neutral-500">

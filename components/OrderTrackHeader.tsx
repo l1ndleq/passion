@@ -98,7 +98,7 @@ export default function OrderTrackHeader({ className = "" }: Props) {
           </div>
 
           <div className="mt-2 text-[11px] text-neutral-500">
-            Номер заказа есть в Telegram/на странице оплаты.
+            Номер заказа есть в Телеграме/на странице оплаты.
           </div>
         </div>
       )}

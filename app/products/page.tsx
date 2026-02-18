@@ -11,13 +11,13 @@ export default function ProductsPage() {
       <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="text-[10px] tracking-[0.22em] uppercase opacity-60">
-            PASSION / PRODUCTS
+            PASSION / КАТАЛОГ
           </div>
 
           <h1 className="mt-3 text-4xl leading-tight">Продукты</h1>
 
           <p className="mt-3 max-w-xl text-sm opacity-70">
-            Выбери продукт и добавь в корзину. Отправка в Telegram происходит
+            Выбери продукт и добавь в корзину. Отправка в Телеграм происходит
             только при оформлении заказа.
           </p>
         </div>

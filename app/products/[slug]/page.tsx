@@ -28,7 +28,7 @@ export default async function ProductPage({
         </Link>
         <span className="mx-2 text-black/40">/</span>
         <Link href="/products" className="hover:text-black transition">
-          products
+          каталог
         </Link>
         <span className="mx-2 text-black/40">/</span>
         <span className="text-black/70">{product.title}</span>
@@ -104,11 +104,11 @@ export default async function ProductPage({
                   product.description ||
                   "Мягкое ежедневное очищение, которое бережно удаляет загрязнения, сохраняя комфорт кожи.",
               },
-              {
-                title: "Состав",
-                content:
-                  "Aqua, Glycerin, Coco-Glucoside, Panthenol, Sodium Hyaluronate, Chamomilla Extract.",
-              },
+                {
+                  title: "Состав",
+                  content:
+                  "Вода, глицерин, коко-глюкозид, пантенол, гиалуронат натрия, экстракт ромашки.",
+                },
               {
                 title: "Способ применения",
                 content:

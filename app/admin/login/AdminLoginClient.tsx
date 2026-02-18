@@ -62,7 +62,7 @@ async function onSubmit(e: React.FormEvent) {
       <div className="w-full max-w-sm rounded-2xl border border-black/10 bg-white p-6 shadow-sm">
         <div className="mb-6">
           <div className="text-xs uppercase tracking-[0.22em] text-black/55">
-            Admin
+            Админ
           </div>
           <h1 className="mt-2 text-2xl font-semibold">Вход</h1>
           <p className="mt-2 text-sm text-black/60">

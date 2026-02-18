@@ -55,6 +55,27 @@ function extractOrderId(pathname: string | null) {
   return parts[idx + 1] ?? null;
 }
 
+function localizeOrderError(message?: string) {
+  const value = (message || "").trim();
+  if (!value) return "Не удалось загрузить заказ";
+
+  switch (value) {
+    case "ORDER_ID_REQUIRED":
+      return "Не указан номер заказа";
+    case "ORDER_NOT_FOUND":
+    case "NOT_FOUND":
+      return "Заказ не найден";
+    case "FORBIDDEN":
+      return "Нет доступа к этому заказу";
+    case "UNAUTHORIZED":
+      return "Требуется авторизация";
+    case "ORDER_PUBLIC_GET_FAILED":
+      return "Не удалось загрузить заказ";
+    default:
+      return value;
+  }
+}
+
 const ORDER_ACCESS_TOKEN_STORAGE_PREFIX = "passion_order_access_token:";
 
 export default function OrderTrackingClient() {
@@ -156,20 +177,20 @@ export default function OrderTrackingClient() {
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        setError(data?.error || data?.message || "Не удалось загрузить заказ");
+        setError(localizeOrderError(data?.error || data?.message));
         setOrder(null);
         return;
       }
 
       if (data?.ok === false || !data?.order) {
-        setError(data?.error || data?.message || "Заказ не найден");
+        setError(localizeOrderError(data?.error || data?.message || "ORDER_NOT_FOUND"));
         setOrder(null);
         return;
       }
 
       setOrder(data.order as PublicOrder);
     } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : "Ошибка сети");
+      setError(error instanceof Error ? localizeOrderError(error.message) : "Ошибка сети");
       setOrder(null);
     } finally {
       setLoading(false);
@@ -185,7 +206,7 @@ export default function OrderTrackingClient() {
   if (!ready) return null;
 
   if (!orderId) {
-    return <div className="p-6 text-red-500 text-sm">ORDER_ID_REQUIRED</div>;
+    return <div className="p-6 text-red-500 text-sm">Не указан номер заказа</div>;
   }
 
   return (
@@ -247,7 +268,7 @@ export default function OrderTrackingClient() {
                 order.status
               )}`}
             >
-              {order.status}
+              {STATUS_LABEL[order.status] ?? order.status}
             </span>
           </div>
 

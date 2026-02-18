@@ -7,7 +7,7 @@ export default function LoadingProducts() {
       <div className="flex items-start justify-between gap-6">
         <div>
           <div className="text-[10px] tracking-[0.22em] uppercase opacity-60">
-            PASSION / PRODUCTS
+            PASSION / КАТАЛОГ
           </div>
 
           <div className="mt-3 h-10 w-48 rounded-xl bg-black/10 animate-pulse" />

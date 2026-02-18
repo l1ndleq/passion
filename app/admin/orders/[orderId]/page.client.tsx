@@ -64,6 +64,23 @@ function formatDate(x?: string | number) {
   return d.toLocaleString();
 }
 
+function localizeAdminOrderError(message?: string) {
+  const value = (message || "").trim();
+  if (!value) return "Не удалось загрузить заказ";
+
+  switch (value) {
+    case "ORDER_ID_REQUIRED":
+      return "Не указан номер заказа";
+    case "ORDER_NOT_FOUND":
+    case "NOT_FOUND":
+      return "Заказ не найден";
+    case "FORBIDDEN":
+      return "Нет доступа к заказу";
+    default:
+      return value;
+  }
+}
+
 export default function OrderAdminClient() {
   const pathname = usePathname();
 
@@ -101,21 +118,21 @@ export default function OrderAdminClient() {
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        setError(data?.error || data?.message || "Не удалось загрузить заказ");
+        setError(localizeAdminOrderError(data?.error || data?.message));
         setOrder(null);
         return;
       }
 
       // ожидаем { ok: true, order: {...} }
       if (data?.ok === false || !data?.order) {
-        setError(data?.error || data?.message || "Заказ не найден");
+        setError(localizeAdminOrderError(data?.error || data?.message || "ORDER_NOT_FOUND"));
         setOrder(null);
         return;
       }
 
       setOrder(data.order as AdminOrder);
     } catch (e: any) {
-      setError(e?.message || "Ошибка сети");
+      setError(e?.message ? localizeAdminOrderError(e.message) : "Ошибка сети");
       setOrder(null);
     } finally {
       setLoading(false);
@@ -141,7 +158,7 @@ export default function OrderAdminClient() {
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        setError(data?.error || data?.message || `HTTP ${res.status}`);
+        setError(localizeAdminOrderError(data?.error || data?.message || `HTTP ${res.status}`));
         return;
       }
 
@@ -161,7 +178,7 @@ export default function OrderAdminClient() {
   if (!ready) return null;
 
   if (!orderId) {
-    return <div className="p-6 text-red-500 text-sm">ORDER_ID_REQUIRED</div>;
+    return <div className="p-6 text-red-500 text-sm">Не указан номер заказа</div>;
   }
 
   return (
@@ -248,7 +265,7 @@ export default function OrderAdminClient() {
               <div className="text-sm text-neutral-700">{order.customer?.name || "—"}</div>
               <div className="text-sm text-neutral-500">Тел: {order.customer?.phone || "—"}</div>
               {order.customer?.email ? (
-                <div className="text-sm text-neutral-500">Email: {order.customer.email}</div>
+                <div className="text-sm text-neutral-500">Эл. почта: {order.customer.email}</div>
               ) : null}
               {order.customer?.address ? (
                 <div className="text-sm text-neutral-500">Адрес: {order.customer.address}</div>
@@ -276,20 +293,20 @@ export default function OrderAdminClient() {
                 disabled={saving}
                 className="w-full border rounded-lg px-3 py-2 text-sm"
               >
-                <option value="new">new</option>
-                <option value="pending_payment">pending_payment</option>
-                <option value="paid">paid</option>
-                <option value="processing">processing</option>
-                <option value="completed">completed</option>
-                <option value="cancelled">cancelled</option>
+                <option value="new">{STATUS_LABEL["new"]}</option>
+                <option value="pending_payment">{STATUS_LABEL["pending_payment"]}</option>
+                <option value="paid">{STATUS_LABEL["paid"]}</option>
+                <option value="processing">{STATUS_LABEL["processing"]}</option>
+                <option value="completed">{STATUS_LABEL["completed"]}</option>
+                <option value="cancelled">{STATUS_LABEL["cancelled"]}</option>
               </select>
             </div>
 
             <div className="text-xs text-neutral-500">
-              Payment status: {order.paymentStatus ?? "—"}
+              Статус оплаты: {order.paymentStatus ?? "—"}
             </div>
             <div className="text-xs text-neutral-500 break-all">
-              Payment ID: {order.paymentId ?? "—"}
+              ID платежа: {order.paymentId ?? "—"}
             </div>
           </div>
         </div>

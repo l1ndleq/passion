@@ -38,6 +38,11 @@ function statusLabel(status?: string) {
   if (!status) return "—";
   if (status === "paid") return "Оплачено ✅";
   if (status === "pending_payment") return "Не оплачено ⏳";
+  if (status === "new") return "Новый";
+  if (status === "processing") return "В обработке";
+  if (status === "completed") return "Завершен";
+  if (status === "cancelled") return "Отменен";
+  if (status === "shipped") return "Отправлен";
   return status;
 }
 
@@ -84,7 +89,7 @@ export default function AccountClient({ phone }: { phone: string }) {
         if (!alive) return;
 
         if (!r.ok || !j?.ok) {
-          setOrdersError(j?.error || "ORDERS_FAILED");
+          setOrdersError("Не удалось загрузить заказы");
           setOrders([]);
           return;
         }
@@ -92,7 +97,7 @@ export default function AccountClient({ phone }: { phone: string }) {
         setOrders(Array.isArray(j.orders) ? j.orders : []);
       } catch {
         if (!alive) return;
-        setOrdersError("ORDERS_FAILED");
+        setOrdersError("Не удалось загрузить заказы");
         setOrders([]);
       } finally {
         if (!alive) return;
@@ -109,7 +114,7 @@ export default function AccountClient({ phone }: { phone: string }) {
 
         if (!r.ok || !j?.ok) {
           setTgLinked(null);
-          setTgError(j?.error || "TG_STATUS_FAILED");
+          setTgError("Не удалось проверить привязку Телеграма");
           return;
         }
 
@@ -117,7 +122,7 @@ export default function AccountClient({ phone }: { phone: string }) {
       } catch {
         if (!alive) return;
         setTgLinked(null);
-        setTgError("TG_STATUS_FAILED");
+        setTgError("Не удалось проверить привязку Телеграма");
       }
     }
 
@@ -155,14 +160,14 @@ export default function AccountClient({ phone }: { phone: string }) {
     try {
       const res = await fetch("/api/auth/logout", { method: "POST" });
       if (!res.ok) {
-        setLogoutError("LOGOUT_FAILED");
+        setLogoutError("Не удалось выйти из аккаунта");
         return;
       }
 
       router.push("/login");
       router.refresh();
     } catch {
-      setLogoutError("LOGOUT_FAILED");
+      setLogoutError("Не удалось выйти из аккаунта");
     } finally {
       setLogoutLoading(false);
     }
@@ -182,15 +187,15 @@ export default function AccountClient({ phone }: { phone: string }) {
           className="rounded-xl border px-3 py-2 text-sm hover:bg-white/70 disabled:opacity-50"
           type="button"
         >
-          {logoutLoading ? "Logging out..." : "Logout"}
+          {logoutLoading ? "Выходим..." : "Выйти"}
         </button>
       </div>
       {logoutError ? <div className="text-xs text-red-600">{logoutError}</div> : null}
 
-      {/* Telegram */}
+      {/* Телеграм */}
       <div className="border border-black/10 rounded-2xl bg-white/40 p-4">
         <div className="flex items-center justify-between gap-3">
-          <div className="font-medium">Telegram</div>
+          <div className="font-medium">Телеграм</div>
           <button
             onClick={() => window.location.reload()}
             className="text-xs text-black/50 hover:text-black transition"
@@ -210,7 +215,7 @@ export default function AccountClient({ phone }: { phone: string }) {
               Привязан ✅
             </span>
             <div className="mt-2 text-xs text-black/50">
-              Коды входа будут приходить в Telegram, если номер совпадает.
+              Коды входа будут приходить в Телеграм, если номер совпадает.
             </div>
           </div>
         ) : (
@@ -220,7 +225,7 @@ export default function AccountClient({ phone }: { phone: string }) {
             </span>
 
             <div className="mt-2 text-xs text-black/50">
-              Привяжи Telegram — и коды входа будут приходить туда автоматически.
+              Привяжи Телеграм — и коды входа будут приходить туда автоматически.
             </div>
 
             {BOT_USERNAME ? (
@@ -234,7 +239,8 @@ export default function AccountClient({ phone }: { phone: string }) {
               </a>
             ) : (
               <div className="mt-3 text-xs text-black/50">
-                Добавь env <code className="px-1 py-0.5 rounded bg-black/5">NEXT_PUBLIC_TELEGRAM_BOT_USERNAME</code>{" "}
+                Добавьте переменную окружения{" "}
+                <code className="px-1 py-0.5 rounded bg-black/5">NEXT_PUBLIC_TELEGRAM_BOT_USERNAME</code>{" "}
                 (без @), чтобы показать кнопку.
               </div>
             )}
@@ -261,15 +267,15 @@ export default function AccountClient({ phone }: { phone: string }) {
               placeholder="+7..."
             />
             <Field
-              label="Email"
+              label="Эл. почта"
               value={profile.email}
               onChange={(v) => saveProfile({ ...profile, email: v })}
-              placeholder="name@email.com"
+              placeholder="почта@пример.рф"
             />
           </div>
 
           <div className="mt-3 text-xs text-black/50">
-            Профиль сохраняется в этом браузере (localStorage). Заказы — на сервере.
+            Профиль сохраняется в этом браузере. Заказы — на сервере.
           </div>
         </div>
 
@@ -297,7 +303,7 @@ export default function AccountClient({ phone }: { phone: string }) {
           </Link>
 
           <div className="mt-2 text-[11px] text-black/50">
-            Номер заказа есть в Telegram/после оформления.
+            Номер заказа есть в Телеграме/после оформления.
           </div>
         </div>
       </div>

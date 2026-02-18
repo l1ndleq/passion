@@ -21,10 +21,18 @@ function formatDate(ts: number) {
 
 function statusLabel(s: string) {
   switch (s) {
+    case "new":
+      return "Новый";
     case "pending_payment":
       return "Не оплачено";
     case "paid":
       return "Оплачено";
+    case "processing":
+      return "В обработке";
+    case "completed":
+      return "Завершен";
+    case "cancelled":
+      return "Отменен";
     case "confirmed":
       return "Подтверждён";
     case "shipped":
@@ -85,7 +93,7 @@ export default function AdminOrdersPage() {
       <div className="flex items-end justify-between gap-3">
         <div>
           <div className="text-[10px] tracking-[0.22em] uppercase opacity-60">
-            PASSION / ADMIN
+            PASSION / АДМИН
           </div>
           <h1 className="mt-2 text-2xl font-medium tracking-tight">Заказы</h1>
           <p className="mt-1 text-sm text-neutral-600">Последние заявки и заказы.</p>

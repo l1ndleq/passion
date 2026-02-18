@@ -44,7 +44,7 @@ export default function LoginClient() {
 
       // DEV: покажем код, чтобы тестить без SMS/TG
       if (data?.devCode) setHint(`DEV-код: ${data.devCode}`);
-      if (data?.channel === "telegram") setHint((prev) => prev ?? "Код отправлен в Telegram");
+      if (data?.channel === "telegram") setHint((prev) => prev ?? "Код отправлен в Телеграм");
       if (data?.channel === "sms") setHint((prev) => prev ?? "Код отправлен по SMS");
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "Ошибка сети");
@@ -144,7 +144,7 @@ export default function LoginClient() {
               rel="noreferrer"
               className="block text-center text-xs text-black/50 hover:text-black transition mt-2"
             >
-              Привязать Telegram (чтобы коды приходили туда)
+              Привязать Телеграм (чтобы коды приходили туда)
             </a>
           </>
         ) : (

@@ -18,24 +18,24 @@ type Product = {
 const featured: Product[] = [
   {
     slug: "silk-cleanser",
-    name: "Silk Cleanser",
-    subtitle: "Gentle Cleanser",
+    name: "Шелковый очищающий гель",
+    subtitle: "Нежное очищение",
     category: "Очищение",
     note: "Мягкое ежедневное очищение, которое сохраняет комфорт кожи.",
-    badge: "New",
+    badge: "Новинка",
   },
   {
     slug: "glow-serum",
-    name: "Glow Serum",
-    subtitle: "Daily Radiance",
+    name: "Сияющая сыворотка",
+    subtitle: "Ежедневное сияние",
     category: "Сыворотка",
     note: "Лёгкая формула для ровного тона и естественного сияния кожи.",
-    badge: "Bestseller",
+    badge: "Хит продаж",
   },
   {
     slug: "soft-cream",
-    name: "Soft Cream",
-    subtitle: "Barrier Support",
+    name: "Мягкий крем",
+    subtitle: "Поддержка барьера",
     category: "Крем",
     note: "Поддержка кожного барьера и ощущение уюта в течение дня.",
   },
@@ -50,7 +50,7 @@ export default function HomePage() {
         <div className="grid md:grid-cols-12 gap-10 items-end">
           <div className="md:col-span-7">
             <p className="text-xs uppercase tracking-[0.22em] text-black/55">
-              passion / skincare
+              passion / уход за кожей
             </p>
 
 <h1 className="mt-5 text-[44px] leading-[0.98] md:text-[86px] tracking-[-0.03em] font-light">
@@ -99,13 +99,13 @@ export default function HomePage() {
             <div className="relative h-[520px] w-full overflow-hidden rounded-[32px]">
               <Image
                 src="/images/hero-texture.jpg"
-                alt="Product texture"
+                alt="Текстура продукта"
                 fill
                 priority
                 className="object-cover"
               />
               <span className="absolute bottom-4 left-4 text-[10px] tracking-[0.22em] text-black/50">
-                PRODUCT TEXTURE
+                ТЕКСТУРА ПРОДУКТА
               </span>
             </div>
           </div> {/* ✅ закрыли md:col-span-5 */}

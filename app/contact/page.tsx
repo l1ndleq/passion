@@ -8,7 +8,7 @@ export default function ContactPage() {
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
       <div className="text-[10px] tracking-[0.22em] uppercase opacity-60">
-        PASSION / CONTACT
+        PASSION / КОНТАКТЫ
       </div>
 
       <h1 className="mt-3 text-4xl leading-tight">Контакты</h1>
@@ -19,7 +19,7 @@ export default function ContactPage() {
 
       <div className="mt-8 grid gap-4 sm:grid-cols-2">
         <div className="rounded-3xl border border-black/5 bg-white/60 p-6 shadow-sm backdrop-blur">
-          <div className="text-xs font-semibold tracking-wide">Telegram</div>
+          <div className="text-xs font-semibold tracking-wide">Телеграм</div>
           <p className="mt-2 text-sm opacity-70">Самый быстрый способ связи.</p>
 
           <a
@@ -31,18 +31,18 @@ export default function ContactPage() {
                        transition-[background-color,transform,opacity] duration-300 ease-out
                        hover:bg-neutral-800 active:scale-[0.98]"
           >
-            Открыть Telegram →
+            Открыть Телеграм →
           </a>
         </div>
 
         <div className="rounded-3xl border border-black/5 bg-white/60 p-6 shadow-sm backdrop-blur">
-          <div className="text-xs font-semibold tracking-wide">Email</div>
+          <div className="text-xs font-semibold tracking-wide">Эл. почта</div>
           <p className="mt-2 text-sm opacity-70">
             Для подробных вопросов и сотрудничества.
           </p>
 
           <a
-            href="mailto:hello@passion.example"
+            href="mailto:support@passion.ru"
             className="mt-4 inline-flex items-center justify-center rounded-full
                        border border-neutral-300 bg-white/60 backdrop-blur
                        px-6 py-3 text-sm font-semibold tracking-wide text-neutral-900

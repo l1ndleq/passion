@@ -2,7 +2,7 @@ export default function AboutPage() {
   return (
     <main className="mx-auto max-w-6xl px-5 py-16 md:py-24">
       <p className="text-xs uppercase tracking-[0.22em] text-black/55">
-        passion / about
+        passion / о бренде
       </p>
 
       <h1 className="mt-5 text-3xl md:text-5xl font-light tracking-[-0.03em]">

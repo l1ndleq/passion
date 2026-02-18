@@ -100,7 +100,7 @@ export default function MobileSearch() {
 
               <div className="mt-2 flex items-center justify-between px-1">
                 <div className="text-[10px] uppercase tracking-[0.22em] text-black/45">
-                  Enter — поиск
+                  ↵ — поиск
                 </div>
 
                 <button
