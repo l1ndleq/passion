@@ -57,6 +57,7 @@ export default function AccountClient({ phone }: { phone: string }) {
 
   const [tgLinked, setTgLinked] = useState<boolean | null>(null);
   const [tgError, setTgError] = useState<string | null>(null);
+  const [tgUnlinkLoading, setTgUnlinkLoading] = useState(false);
   const [logoutLoading, setLogoutLoading] = useState(false);
   const [logoutError, setLogoutError] = useState<string | null>(null);
 
@@ -173,6 +174,31 @@ export default function AccountClient({ phone }: { phone: string }) {
     }
   }
 
+  async function unlinkTelegram() {
+    if (tgUnlinkLoading) return;
+
+    setTgUnlinkLoading(true);
+    setTgError(null);
+
+    try {
+      const res = await fetch("/api/account/telegram-status", {
+        method: "DELETE",
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok || !data?.ok) {
+        setTgError("Не удалось отвязать Телеграм");
+        return;
+      }
+
+      setTgLinked(false);
+    } catch {
+      setTgError("Не удалось отвязать Телеграм");
+    } finally {
+      setTgUnlinkLoading(false);
+    }
+  }
+
   return (
     <div className="max-w-5xl mx-auto p-6 space-y-6">
       <div className="flex items-start justify-between gap-3">
@@ -198,7 +224,8 @@ export default function AccountClient({ phone }: { phone: string }) {
           <div className="font-medium">Телеграм</div>
           <button
             onClick={() => window.location.reload()}
-            className="text-xs text-black/50 hover:text-black transition"
+            disabled={tgUnlinkLoading}
+            className="text-xs text-black/50 hover:text-black transition disabled:opacity-50"
             type="button"
           >
             Обновить
@@ -217,6 +244,14 @@ export default function AccountClient({ phone }: { phone: string }) {
             <div className="mt-2 text-xs text-black/50">
               Уведомления о заказах будут приходить в Телеграм для этого номера.
             </div>
+            <button
+              onClick={unlinkTelegram}
+              disabled={tgUnlinkLoading}
+              className="mt-3 rounded-xl border px-3 py-2 text-sm hover:bg-white/70 disabled:opacity-50"
+              type="button"
+            >
+              {tgUnlinkLoading ? "Отвязываем..." : "Отвязать Telegram"}
+            </button>
           </div>
         ) : (
           <div className="mt-3 text-sm">
