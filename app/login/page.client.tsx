@@ -142,6 +142,9 @@ export default function LoginClient() {
 
       // DEV: покажем код, чтобы тестить без SMS/TG
       if (data?.devCode) setHint(`DEV-код: ${data.devCode}`);
+      if (data?.channel === "telegram_gateway") {
+        setHint((prev) => prev ?? "Код отправлен в Telegram по номеру телефона");
+      }
       if (data?.channel === "telegram") setHint((prev) => prev ?? "Код отправлен в Телеграм");
       if (data?.channel === "sms") setHint((prev) => prev ?? "Код отправлен по SMS");
     } catch (error: unknown) {
