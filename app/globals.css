@@ -10,3 +10,45 @@ body {
   background: #fbf7f3;
   color: #141414;
 }
+
+.tg-btn {
+  background: linear-gradient(180deg, #69b7ea 0%, #58a7dc 100%);
+  color: #ffffff;
+  border: 1px solid rgba(46, 130, 182, 0.52);
+  box-shadow:
+    0 10px 24px rgba(88, 167, 220, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  transition:
+    transform 140ms ease,
+    box-shadow 220ms ease,
+    filter 220ms ease;
+}
+
+.tg-btn:hover {
+  transform: translateY(-1px);
+  filter: saturate(1.04);
+  box-shadow:
+    0 12px 28px rgba(88, 167, 220, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.42);
+}
+
+.tg-btn:active {
+  transform: translateY(0);
+}
+
+.tg-btn:focus-visible {
+  outline: 2px solid rgba(88, 167, 220, 0.44);
+  outline-offset: 2px;
+}
+
+.tg-btn__icon {
+  display: inline-grid;
+  place-items: center;
+  width: 1.45rem;
+  height: 1.45rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.24);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  font-size: 0.8rem;
+  line-height: 1;
+}

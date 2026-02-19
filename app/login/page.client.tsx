@@ -142,8 +142,9 @@ export default function LoginClient() {
               href="https://t.me/PassionLoginBot?start=link"
               target="_blank"
               rel="noreferrer"
-              className="block text-center text-xs text-black/50 hover:text-black transition mt-2"
+              className="tg-btn mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm"
             >
+              <span className="tg-btn__icon" aria-hidden="true">✈</span>
               Привязать Телеграм (чтобы коды приходили туда)
             </a>
           </>

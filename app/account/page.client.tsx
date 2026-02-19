@@ -230,11 +230,12 @@ export default function AccountClient({ phone }: { phone: string }) {
 
             {BOT_USERNAME ? (
               <a
-                className="mt-3 inline-flex items-center justify-center rounded-xl border px-3 py-2 text-sm hover:bg-white/70"
+                className="tg-btn mt-3 inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm"
                 href={`https://t.me/${BOT_USERNAME}`}
                 target="_blank"
                 rel="noreferrer"
               >
+                <span className="tg-btn__icon" aria-hidden="true">✈</span>
                 Открыть бота и привязать
               </a>
             ) : (

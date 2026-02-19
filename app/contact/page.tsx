@@ -26,11 +26,11 @@ export default function ContactPage() {
             href="https://t.me/@asssion6"
             target="_blank"
             rel="noreferrer"
-            className="mt-4 inline-flex items-center justify-center rounded-full
-                       bg-neutral-900 px-6 py-3 text-sm font-semibold tracking-wide text-white
-                       transition-[background-color,transform,opacity] duration-300 ease-out
-                       hover:bg-neutral-800 active:scale-[0.98]"
+            className="tg-btn mt-4 inline-flex items-center justify-center gap-2 rounded-full
+                       px-6 py-3 text-sm font-semibold tracking-wide
+                       transition-[transform,opacity] duration-300 ease-out active:scale-[0.98]"
           >
+            <span className="tg-btn__icon" aria-hidden="true">✈</span>
             Открыть Телеграм →
           </a>
         </div>
