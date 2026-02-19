@@ -215,7 +215,7 @@ export default function AccountClient({ phone }: { phone: string }) {
               Привязан ✅
             </span>
             <div className="mt-2 text-xs text-black/50">
-              Коды входа будут приходить в Телеграм, если номер совпадает.
+              Уведомления о заказах будут приходить в Телеграм для этого номера.
             </div>
           </div>
         ) : (
@@ -225,7 +225,7 @@ export default function AccountClient({ phone }: { phone: string }) {
             </span>
 
             <div className="mt-2 text-xs text-black/50">
-              Привяжи Телеграм — и коды входа будут приходить туда автоматически.
+              Привяжи Телеграм — и уведомления о заказах будут приходить туда автоматически.
             </div>
 
             {BOT_USERNAME ? (

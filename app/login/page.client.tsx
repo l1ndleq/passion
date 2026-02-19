@@ -1,14 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-
-type TelegramPollResponse = {
-  ok?: boolean;
-  status?: "pending" | "authorized" | "expired";
-  next?: string;
-  error?: string;
-};
+import { useState } from "react";
 
 export default function LoginClient() {
   const router = useRouter();
@@ -21,103 +14,12 @@ export default function LoginClient() {
   const [loading, setLoading] = useState(false);
   const [hint, setHint] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [tgLoading, setTgLoading] = useState(false);
-
-  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const pollBusyRef = useRef(false);
 
   const nextPathRaw = searchParams.get("next");
   const nextPath =
     nextPathRaw && nextPathRaw.startsWith("/") && !nextPathRaw.startsWith("//")
       ? nextPathRaw
       : "/account";
-
-  function stopTelegramPolling() {
-    if (pollTimerRef.current) {
-      clearInterval(pollTimerRef.current);
-      pollTimerRef.current = null;
-    }
-    pollBusyRef.current = false;
-  }
-
-  useEffect(() => {
-    return () => stopTelegramPolling();
-  }, []);
-
-  async function startTelegramLogin() {
-    if (tgLoading) return;
-
-    setTgLoading(true);
-    setError(null);
-    setHint(null);
-    stopTelegramPolling();
-
-    try {
-      const res = await fetch("/api/auth/telegram/start", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ next: nextPath }),
-      });
-
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data?.ok || !data?.state || !data?.url) {
-        setError(data?.error || `HTTP ${res.status}`);
-        return;
-      }
-
-      window.open(String(data.url), "_blank", "noopener,noreferrer");
-      setHint("Подтвердите номер в Телеграме. Ожидаем подтверждение...");
-
-      const state = String(data.state);
-
-      pollTimerRef.current = setInterval(async () => {
-        if (pollBusyRef.current) return;
-        pollBusyRef.current = true;
-
-        try {
-          const pollRes = await fetch("/api/auth/telegram/poll", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ state }),
-          });
-
-          const pollData = (await pollRes.json().catch(() => ({}))) as TelegramPollResponse;
-
-          if (!pollRes.ok || !pollData?.ok) {
-            stopTelegramPolling();
-            setError(pollData?.error || `HTTP ${pollRes.status}`);
-            return;
-          }
-
-          if (pollData.status === "authorized") {
-            stopTelegramPolling();
-            router.push(
-              pollData.next && pollData.next.startsWith("/") && !pollData.next.startsWith("//")
-                ? pollData.next
-                : nextPath
-            );
-            router.refresh();
-            return;
-          }
-
-          if (pollData.status === "expired") {
-            stopTelegramPolling();
-            setHint(null);
-            setError("Ссылка входа устарела. Нажмите кнопку входа через Телеграм снова.");
-          }
-        } catch {
-          stopTelegramPolling();
-          setError("Ошибка сети");
-        } finally {
-          pollBusyRef.current = false;
-        }
-      }, 2000);
-    } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : "Ошибка сети");
-    } finally {
-      setTgLoading(false);
-    }
-  }
 
   async function request() {
     setLoading(true);
@@ -140,15 +42,15 @@ export default function LoginClient() {
 
       setStage("code");
 
-      // DEV: покажем код, чтобы тестить без SMS/TG
       if (data?.devCode) setHint(`DEV-код: ${data.devCode}`);
       if (data?.channel === "telegram_gateway") {
         setHint((prev) => prev ?? "Код отправлен в Telegram по номеру телефона");
       }
-      if (data?.channel === "telegram") setHint((prev) => prev ?? "Код отправлен в Телеграм");
-      if (data?.channel === "sms") setHint((prev) => prev ?? "Код отправлен по SMS");
-    } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : "Ошибка сети");
+      if (data?.channel === "sms") {
+        setHint((prev) => prev ?? "Код отправлен по SMS");
+      }
+    } catch (requestError: unknown) {
+      setError(requestError instanceof Error ? requestError.message : "Ошибка сети");
     } finally {
       setLoading(false);
     }
@@ -174,8 +76,8 @@ export default function LoginClient() {
 
       router.push(nextPath);
       router.refresh();
-    } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : "Ошибка сети");
+    } catch (verifyError: unknown) {
+      setError(verifyError instanceof Error ? verifyError.message : "Ошибка сети");
     } finally {
       setLoading(false);
     }
@@ -229,26 +131,14 @@ export default function LoginClient() {
         ) : null}
 
         {stage === "phone" ? (
-          <>
-            <button
-              onClick={request}
-              disabled={loading || phone.trim().length < 10}
-              className="w-full rounded-xl border px-3 py-2 text-sm hover:bg-white/70 disabled:opacity-50"
-              type="button"
-            >
-              Получить код
-            </button>
-
-            <button
-              onClick={startTelegramLogin}
-              disabled={loading || tgLoading}
-              className="tg-btn mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm disabled:opacity-60"
-              type="button"
-            >
-              <span className="tg-btn__icon" aria-hidden="true">✈</span>
-              {tgLoading ? "Открываем Телеграм..." : "Войти через Телеграм"}
-            </button>
-          </>
+          <button
+            onClick={request}
+            disabled={loading || phone.trim().length < 10}
+            className="w-full rounded-xl border px-3 py-2 text-sm hover:bg-white/70 disabled:opacity-50"
+            type="button"
+          >
+            Получить код
+          </button>
         ) : (
           <>
             <button

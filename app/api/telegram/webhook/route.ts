@@ -98,7 +98,7 @@ export async function POST(req: Request) {
 
       await tgSend(
         chatId,
-        "Чтобы привязать номер для входа, нажмите кнопку ниже и отправьте контакт."
+        "Чтобы привязать Телеграм для уведомлений, нажмите кнопку ниже и отправьте контакт."
       );
 
       // Кнопка "Поделиться контактом"
@@ -162,7 +162,7 @@ export async function POST(req: Request) {
         }
       }
 
-      await tgSend(chatId, `Готово! Номер ${phone} привязан. Теперь коды будут приходить сюда.`);
+      await tgSend(chatId, `Готово! Номер ${phone} привязан. Теперь уведомления о заказах будут приходить сюда.`);
       return NextResponse.json({ ok: true });
     }
 
