@@ -67,6 +67,9 @@ export default function AccountClient({ phone }: { phone: string }) {
   const [trackValue, setTrackValue] = useState("");
 
   const BOT_USERNAME = sanitizeTelegramUsername(process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || "");
+  const BOT_LINK = BOT_USERNAME
+    ? `https://t.me/${BOT_USERNAME}?start=${encodeURIComponent("bind_account")}`
+    : "";
 
   useEffect(() => {
     const stored = safeJson<Partial<Profile>>(localStorage.getItem(PROFILE_KEY), {});
@@ -349,7 +352,7 @@ export default function AccountClient({ phone }: { phone: string }) {
             {BOT_USERNAME ? (
               <a
                 className="tg-btn mt-3 inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm"
-                href={`https://t.me/${BOT_USERNAME}`}
+                href={BOT_LINK}
                 target="_blank"
                 rel="noreferrer"
               >
@@ -456,10 +459,12 @@ export default function AccountClient({ phone }: { phone: string }) {
 }
 
 function TelegramLogoIcon({ className = "h-5 w-5" }: { className?: string }) {
+  const iconClassName = `${className} block shrink-0 -translate-y-px`;
+
   return (
     <svg
       viewBox="0 0 240 240"
-      className={className}
+      className={iconClassName}
       aria-hidden="true"
       focusable="false"
     >
