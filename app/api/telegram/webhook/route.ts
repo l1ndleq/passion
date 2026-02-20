@@ -27,17 +27,24 @@ type ChatState = {
   type: "awaiting_order_id";
 };
 
+type TelegramUser = {
+  id?: number;
+  username?: string;
+  first_name?: string;
+  last_name?: string;
+};
+
 type TelegramUpdate = {
   message?: {
     chat?: { id?: number | string };
     text?: string;
-    from?: { id?: number; username?: string; first_name?: string; last_name?: string };
+    from?: TelegramUser;
     contact?: { phone_number?: string; user_id?: number };
   };
   callback_query?: {
     id?: string;
     data?: string;
-    from?: { id?: number; username?: string; first_name?: string; last_name?: string };
+    from?: TelegramUser;
     message?: { chat?: { id?: number | string } };
   };
 };
@@ -226,7 +233,7 @@ async function getLinkedPhoneDigits(chatId: number | string) {
   return digits || null;
 }
 
-async function sendProfile(chatId: number | string, from?: TelegramUpdate["message"]["from"]) {
+async function sendProfile(chatId: number | string, from?: TelegramUser) {
   const digits = await getLinkedPhoneDigits(chatId);
   if (!digits) {
     await tgSend(chatId, "Профиль не привязан к номеру. Сначала нажмите «Привязать номер».");
