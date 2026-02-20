@@ -16,6 +16,9 @@ const TELEGRAM_AUTH_TTL_SECONDS = 10 * 60;
 const TG_CHAT_STATE_PREFIX = "tg:chat_state:";
 const TG_CHAT_STATE_TTL_SECONDS = 5 * 60;
 
+const TG_CART_PREFIX = "tg:cart:";
+const TG_CART_TTL_SECONDS = 60 * 60 * 24 * 30;
+
 type TelegramAuthState = {
   status?: "pending" | "ready";
   next?: string;
@@ -62,6 +65,10 @@ type StoredOrder = {
   };
 };
 
+type BotCart = {
+  items: Array<{ id: string; qty: number }>;
+};
+
 function normalizePhone(raw: string) {
   let s = String(raw || "").trim().replace(/[^\d+]/g, "");
   if (s.startsWith("8") && s.length === 11) s = `+7${s.slice(1)}`;
@@ -75,7 +82,9 @@ function phoneDigits(phone: string) {
 }
 
 function extractStartPayload(text: string) {
-  const match = String(text || "").trim().match(/^\/start(?:@\w+)?(?:\s+(.+))?$/i);
+  const match = String(text || "")
+    .trim()
+    .match(/^\/start(?:@\w+)?(?:\s+(.+))?$/i);
   return String(match?.[1] || "").trim();
 }
 
@@ -141,6 +150,24 @@ function getSiteUrl(req: Request) {
   }
 }
 
+function getProductById(id: string) {
+  const needle = String(id || "").trim();
+  return PRODUCTS.find((p) => p.id === needle) || null;
+}
+
+function menuReplyMarkup() {
+  return {
+    keyboard: [
+      [{ text: "🛍 Каталог" }, { text: "🛒 Корзина" }],
+      [{ text: "💳 Оформить заказ" }, { text: "📦 Мои заказы" }],
+      [{ text: "🔎 Найти заказ" }, { text: "👤 Профиль" }],
+      [{ text: "📱 Привязать номер" }, { text: "❓ Помощь" }],
+    ],
+    resize_keyboard: true,
+    is_persistent: true,
+  };
+}
+
 async function tgCall(method: string, payload: Record<string, unknown>) {
   const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/${method}`, {
     method: "POST",
@@ -170,34 +197,11 @@ async function tgAnswerCallback(callbackQueryId: string | undefined, text?: stri
   });
 }
 
-function mainMenuKeyboard(siteUrl: string) {
-  return {
-    inline_keyboard: [
-      [
-        { text: "🛍 Каталог", url: `${siteUrl}/products` },
-        { text: "🛒 Корзина", url: `${siteUrl}/cart` },
-      ],
-      [
-        { text: "💳 Оформить заказ", url: `${siteUrl}/checkout` },
-        { text: "👤 Личный кабинет", url: `${siteUrl}/account` },
-      ],
-      [
-        { text: "📦 Мои заказы", callback_data: "MY_ORDERS" },
-        { text: "🔎 Найти заказ", callback_data: "TRACK_ORDER" },
-      ],
-      [
-        { text: "📱 Привязать номер", callback_data: "ASK_CONTACT" },
-        { text: "👤 Профиль", callback_data: "MY_PROFILE" },
-      ],
-    ],
-  };
-}
-
-async function sendMainMenu(chatId: number | string, siteUrl: string) {
+async function sendMainMenu(chatId: number | string) {
   await tgSend(
     chatId,
-    "Главное меню Passion. Здесь можно открыть каталог, корзину, оформление и отслеживание заказов.",
-    { reply_markup: mainMenuKeyboard(siteUrl) }
+    "Главное меню Passion. Используйте кнопки снизу: каталог, корзина, оформление, профиль и заказы.",
+    { reply_markup: menuReplyMarkup() }
   );
 }
 
@@ -213,6 +217,71 @@ async function requestContact(chatId: number | string, text?: string) {
       },
     }
   );
+}
+
+function cartKey(chatId: number | string) {
+  return `${TG_CART_PREFIX}${chatId}`;
+}
+
+async function readCart(chatId: number | string): Promise<BotCart> {
+  const raw = await redis.get<BotCart>(cartKey(chatId));
+  const items = Array.isArray(raw?.items)
+    ? raw.items
+        .map((x) => ({ id: String(x?.id || ""), qty: Number(x?.qty || 0) }))
+        .filter((x) => x.id && Number.isFinite(x.qty) && x.qty > 0)
+        .map((x) => ({ id: x.id, qty: Math.min(99, Math.floor(x.qty)) }))
+    : [];
+  return { items };
+}
+
+async function writeCart(chatId: number | string, cart: BotCart) {
+  await redis.set(cartKey(chatId), cart, { ex: TG_CART_TTL_SECONDS });
+}
+
+async function clearCart(chatId: number | string) {
+  await redis.del(cartKey(chatId));
+}
+
+async function addToCart(chatId: number | string, productId: string, delta = 1) {
+  const cart = await readCart(chatId);
+  const id = String(productId || "").trim();
+  if (!getProductById(id)) return cart;
+
+  const idx = cart.items.findIndex((x) => x.id === id);
+  if (idx === -1) {
+    cart.items.push({ id, qty: Math.max(1, Math.floor(delta || 1)) });
+  } else {
+    cart.items[idx].qty = Math.min(99, Math.max(1, cart.items[idx].qty + delta));
+  }
+
+  await writeCart(chatId, cart);
+  return cart;
+}
+
+function hydrateCart(cart: BotCart) {
+  const items = cart.items
+    .map((it) => {
+      const p = getProductById(it.id);
+      if (!p) return null;
+      const qty = Math.max(1, Math.floor(Number(it.qty || 1)));
+      return {
+        id: p.id,
+        title: p.title,
+        price: Number(p.price || 0),
+        qty,
+        sum: Number(p.price || 0) * qty,
+      };
+    })
+    .filter(Boolean) as Array<{
+    id: string;
+    title: string;
+    price: number;
+    qty: number;
+    sum: number;
+  }>;
+
+  const total = items.reduce((acc, it) => acc + it.sum, 0);
+  return { items, total };
 }
 
 async function savePhoneBinding(chatId: number | string, phoneRaw: string) {
@@ -236,7 +305,7 @@ async function getLinkedPhoneDigits(chatId: number | string) {
 async function sendProfile(chatId: number | string, from?: TelegramUser) {
   const digits = await getLinkedPhoneDigits(chatId);
   if (!digits) {
-    await tgSend(chatId, "Профиль не привязан к номеру. Сначала нажмите «Привязать номер».");
+    await tgSend(chatId, "Профиль не привязан к номеру. Нажмите «📱 Привязать номер».");
     return;
   }
 
@@ -256,25 +325,56 @@ async function sendProfile(chatId: number | string, from?: TelegramUser) {
     `Адрес: ${profile?.address || "—"}`,
     `Telegram: ${username ? `@${username}` : "—"}`,
   ];
-  await tgSend(chatId, lines.join("\n"));
+  await tgSend(chatId, lines.join("\n"), { reply_markup: menuReplyMarkup() });
 }
 
-async function sendCatalogPreview(chatId: number | string, siteUrl: string) {
-  const lines = ["🛍 Каталог Passion", ""];
-  for (const p of PRODUCTS.slice(0, 6)) {
+async function sendCatalog(chatId: number | string) {
+  const lines = ["🛍 Каталог", ""];
+  for (const p of PRODUCTS) {
     lines.push(`• ${p.title} — ${formatMoney(p.price)} ₽`);
   }
   lines.push("");
-  lines.push("Полный каталог и оформление доступны по кнопкам ниже.");
+  lines.push("Нажмите кнопку товара ниже, чтобы добавить в корзину.");
+
+  const inlineKeyboard = PRODUCTS.map((p) => [
+    {
+      text: `➕ ${p.title} (${formatMoney(p.price)} ₽)`,
+      callback_data: `CART_ADD:${p.id}`,
+    },
+  ]);
+  inlineKeyboard.push([{ text: "🛒 Показать корзину", callback_data: "CART_SHOW" }]);
+
+  await tgSend(chatId, lines.join("\n"), {
+    reply_markup: { inline_keyboard: inlineKeyboard },
+  });
+}
+
+async function sendCart(chatId: number | string) {
+  const cart = await readCart(chatId);
+  const hydrated = hydrateCart(cart);
+
+  if (!hydrated.items.length) {
+    await tgSend(chatId, "🛒 Корзина пока пустая.", {
+      reply_markup: {
+        inline_keyboard: [[{ text: "🛍 Открыть каталог", callback_data: "CATALOG" }]],
+      },
+    });
+    return;
+  }
+
+  const lines = ["🛒 Ваша корзина", ""];
+  for (const it of hydrated.items) {
+    lines.push(`• ${it.title} × ${it.qty} — ${formatMoney(it.sum)} ₽`);
+  }
+  lines.push("");
+  lines.push(`Итого: ${formatMoney(hydrated.total)} ₽`);
 
   await tgSend(chatId, lines.join("\n"), {
     reply_markup: {
       inline_keyboard: [
-        [{ text: "Открыть каталог", url: `${siteUrl}/products` }],
-        [
-          { text: "Корзина", url: `${siteUrl}/cart` },
-          { text: "Оформить", url: `${siteUrl}/checkout` },
-        ],
+        [{ text: "➕ Добавить товары", callback_data: "CATALOG" }],
+        [{ text: "💳 Оформить заказ", callback_data: "CHECKOUT" }],
+        [{ text: "🧹 Очистить корзину", callback_data: "CART_CLEAR" }],
       ],
     },
   });
@@ -334,14 +434,14 @@ async function sendOrderDetails(
   await tgSend(chatId, lines.join("\n"), {
     reply_markup: {
       inline_keyboard: [
-        [{ text: "Открыть на сайте", url: orderUrl }],
-        [{ text: "⬅️ Меню", callback_data: "MAIN_MENU" }],
+        [{ text: "Открыть на сайте (опц.)", url: orderUrl }],
+        [{ text: "⬅️ К заказам", callback_data: "MY_ORDERS" }],
       ],
     },
   });
 }
 
-async function sendMyOrders(chatId: number | string, siteUrl: string) {
+async function sendMyOrders(chatId: number | string) {
   const linkedDigits = await getLinkedPhoneDigits(chatId);
   if (!linkedDigits) {
     await tgSend(chatId, "Чтобы смотреть свои заказы, сначала привяжите номер телефона.");
@@ -349,7 +449,7 @@ async function sendMyOrders(chatId: number | string, siteUrl: string) {
     return;
   }
 
-  const idsRaw = await redis.lrange<string[]>(`user:orders:${linkedDigits}`, 0, 9);
+  const idsRaw = (await redis.lrange(`user:orders:${linkedDigits}`, 0, 9)) as unknown[];
   const ids = (Array.isArray(idsRaw) ? idsRaw : [])
     .map((x) => normalizeOrderId(String(x || "")))
     .filter(Boolean);
@@ -379,38 +479,130 @@ async function sendMyOrders(chatId: number | string, siteUrl: string) {
     const sum = `${formatMoney(Number(o.totalPrice || 0))} ₽`;
     lines.push(`• ${orderId} — ${status} — ${sum}`);
   }
-  lines.push("");
-  lines.push("Чтобы открыть заказ: /order НОМЕР_ЗАКАЗА");
 
-  const latest = ownOrders[0];
-  const latestId = normalizeOrderId(String(latest.orderId || ""));
-  const latestPhone = String(latest.customer?.phone || `+${linkedDigits}`);
-  const latestOrderUrl = latestId
-    ? buildOrderTrackingUrl(siteUrl, latestId, latestPhone)
-    : `${siteUrl}/account`;
+  const inlineKeyboard = ownOrders.slice(0, 6).map((o) => {
+    const id = normalizeOrderId(String(o.orderId || ""));
+    return [{ text: `Открыть ${id}`, callback_data: `ORDER:${id}` }];
+  });
+  inlineKeyboard.push([{ text: "🔎 Найти по номеру", callback_data: "TRACK_ORDER" }]);
 
   await tgSend(chatId, lines.join("\n"), {
-    reply_markup: {
-      inline_keyboard: [
-        [{ text: "Открыть последний заказ", url: latestOrderUrl }],
-        [{ text: "⬅️ Меню", callback_data: "MAIN_MENU" }],
-      ],
-    },
+    reply_markup: { inline_keyboard: inlineKeyboard },
   });
+}
+
+function localizeCreateOrderError(code: string) {
+  switch (code) {
+    case "ITEMS_REQUIRED":
+      return "Корзина пуста.";
+    case "PHONE_REQUIRED":
+      return "Не найден телефон. Нажмите «📱 Привязать номер».";
+    case "PHONE_INVALID":
+      return "Телефон указан некорректно. Нажмите «📱 Привязать номер».";
+    case "NAME_REQUIRED":
+      return "Не удалось определить имя. Заполните профиль на сайте или напишите имя в чат.";
+    case "TOO_MANY_REQUESTS":
+      return "Слишком много попыток. Повторите чуть позже.";
+    default:
+      return `Не удалось оформить заказ (${code || "UNKNOWN"}).`;
+  }
+}
+
+function deriveDisplayName(user?: TelegramUser) {
+  const first = String(user?.first_name || "").trim();
+  const last = String(user?.last_name || "").trim();
+  const full = [first, last].filter(Boolean).join(" ").trim();
+  if (full) return full;
+  const username = String(user?.username || "").trim();
+  if (username) return `@${username}`;
+  return "Telegram клиент";
+}
+
+async function checkoutFromBot(chatId: number | string, siteUrl: string, user?: TelegramUser) {
+  const linkedDigits = await getLinkedPhoneDigits(chatId);
+  if (!linkedDigits) {
+    await tgSend(chatId, "Чтобы оформить заказ, сначала привяжите номер телефона.");
+    await requestContact(chatId);
+    return;
+  }
+
+  const cart = await readCart(chatId);
+  const hydrated = hydrateCart(cart);
+  if (!hydrated.items.length) {
+    await tgSend(chatId, "Корзина пустая. Сначала добавьте товары.");
+    return;
+  }
+
+  const profile = await redis.get<{
+    name?: string;
+    phone?: string;
+    city?: string;
+    address?: string;
+  }>(`user:profile:${linkedDigits}`);
+
+  const phoneCandidate = String(profile?.phone || `+${linkedDigits}`);
+  const phone = normalizePhone(phoneCandidate);
+  const name = String(profile?.name || deriveDisplayName(user)).trim();
+  const telegramUsername = String(user?.username || "").trim();
+
+  const body = {
+    customer: {
+      name,
+      phone,
+      telegram: telegramUsername || null,
+      city: String(profile?.city || ""),
+      address: String(profile?.address || ""),
+      message: "Заказ оформлен через Telegram-бота",
+    },
+    items: hydrated.items.map((x) => ({
+      id: x.id,
+      qty: x.qty,
+    })),
+    totalPrice: hydrated.total,
+  };
+
+  const res = await fetch(`${siteUrl}/api/pay/create`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Origin: siteUrl,
+      "x-forwarded-for": `tg-${chatId}`,
+    },
+    body: JSON.stringify(body),
+  });
+
+  const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; orderId?: string };
+  if (!res.ok || !data?.ok) {
+    await tgSend(chatId, localizeCreateOrderError(String(data?.error || "")));
+    return;
+  }
+
+  await clearCart(chatId);
+  const orderId = normalizeOrderId(String(data.orderId || ""));
+  if (!orderId) {
+    await tgSend(chatId, "Заказ создан, но не удалось получить номер. Напишите в поддержку.");
+    return;
+  }
+
+  await tgSend(chatId, `✅ Заказ создан: ${orderId}. Корзина очищена.`);
+  await sendOrderDetails(chatId, orderId, siteUrl);
 }
 
 async function sendHelp(chatId: number | string) {
   await tgSend(
     chatId,
     [
-      "Доступные команды:",
-      "/menu — главное меню",
-      "/catalog — каталог",
-      "/orders — мои заказы",
-      "/order P-XXXX — открыть конкретный заказ",
-      "/profile — профиль",
-      "/help — помощь",
-    ].join("\n")
+      "Управление ботом:",
+      "• Кнопки снизу — основной способ.",
+      "• Каталог — добавить товары в корзину.",
+      "• Корзина — проверить и оформить заказ.",
+      "• Мои заказы — список последних заказов.",
+      "• Найти заказ — ввод номера заказа.",
+      "",
+      "Резервные команды:",
+      "/menu /catalog /cart /checkout /orders /order P-XXXX /profile /help",
+    ].join("\n"),
+    { reply_markup: menuReplyMarkup() }
   );
 }
 
@@ -425,6 +617,10 @@ async function setChatState(chatId: number | string, state: ChatState | null) {
 
 async function getChatState(chatId: number | string) {
   return redis.get<ChatState>(`${TG_CHAT_STATE_PREFIX}${chatId}`);
+}
+
+function textLooksLike(text: string, keyword: string) {
+  return text.toLowerCase().includes(keyword.toLowerCase());
 }
 
 export async function POST(req: Request) {
@@ -459,8 +655,45 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: true });
       }
 
+      if (data === "CATALOG") {
+        await sendCatalog(chatId);
+        await tgAnswerCallback(callback.id);
+        return NextResponse.json({ ok: true });
+      }
+
+      if (data.startsWith("CART_ADD:")) {
+        const productId = String(data.split(":")[1] || "").trim();
+        const p = getProductById(productId);
+        if (!p) {
+          await tgAnswerCallback(callback.id, "Товар не найден");
+          return NextResponse.json({ ok: true });
+        }
+        await addToCart(chatId, productId, 1);
+        await tgAnswerCallback(callback.id, `Добавлено: ${p.title}`);
+        return NextResponse.json({ ok: true });
+      }
+
+      if (data === "CART_SHOW") {
+        await sendCart(chatId);
+        await tgAnswerCallback(callback.id);
+        return NextResponse.json({ ok: true });
+      }
+
+      if (data === "CART_CLEAR") {
+        await clearCart(chatId);
+        await tgSend(chatId, "🧹 Корзина очищена.", { reply_markup: menuReplyMarkup() });
+        await tgAnswerCallback(callback.id);
+        return NextResponse.json({ ok: true });
+      }
+
+      if (data === "CHECKOUT") {
+        await checkoutFromBot(chatId, siteUrl, callback.from);
+        await tgAnswerCallback(callback.id);
+        return NextResponse.json({ ok: true });
+      }
+
       if (data === "MY_ORDERS") {
-        await sendMyOrders(chatId, siteUrl);
+        await sendMyOrders(chatId);
         await tgAnswerCallback(callback.id);
         return NextResponse.json({ ok: true });
       }
@@ -473,13 +706,16 @@ export async function POST(req: Request) {
 
       if (data === "TRACK_ORDER") {
         await setChatState(chatId, { type: "awaiting_order_id" });
-        await tgSend(chatId, "Отправьте номер заказа (пример: P-MLGLJ641).");
+        await tgSend(chatId, "Отправьте номер заказа (пример: P-MLGLJ641).", {
+          reply_markup: menuReplyMarkup(),
+        });
         await tgAnswerCallback(callback.id);
         return NextResponse.json({ ok: true });
       }
 
-      if (data === "MAIN_MENU") {
-        await sendMainMenu(chatId, siteUrl);
+      if (data.startsWith("ORDER:")) {
+        const orderId = String(data.slice("ORDER:".length) || "");
+        await sendOrderDetails(chatId, orderId, siteUrl);
         await tgAnswerCallback(callback.id);
         return NextResponse.json({ ok: true });
       }
@@ -518,16 +754,15 @@ export async function POST(req: Request) {
       }
 
       if (payload === "bind_account") {
-        await requestContact(chatId, "Чтобы привязать Telegram к вашему аккаунту, отправьте контакт.");
+        await requestContact(chatId, "Чтобы привязать Telegram к аккаунту, отправьте контакт.");
         return NextResponse.json({ ok: true });
       }
 
       await tgSend(
         chatId,
-        "Добро пожаловать в Passion. Через этого бота можно смотреть заказы, профиль и открывать каталог/корзину/оформление.",
-        { reply_markup: mainMenuKeyboard(siteUrl) }
+        "Добро пожаловать в Passion. Теперь каталог, корзина и оформление доступны прямо в этом чате.",
+        { reply_markup: menuReplyMarkup() }
       );
-      await tgSend(chatId, "Для полного доступа привяжите номер: нажмите «📱 Привязать номер».");
       return NextResponse.json({ ok: true });
     }
 
@@ -562,48 +797,70 @@ export async function POST(req: Request) {
             { ex: TELEGRAM_AUTH_TTL_SECONDS }
           );
           await redis.del(`${TELEGRAM_AUTH_CHAT_PREFIX}${chatId}`);
-          await tgSend(chatId, "Готово! Возвращайтесь на сайт: вход выполнится автоматически.");
-          await tgSend(chatId, "Клавиатура очищена.", { reply_markup: { remove_keyboard: true } });
+          await tgSend(chatId, "✅ Готово! Возвращайтесь на сайт: вход выполнится автоматически.");
+          await sendMainMenu(chatId);
           return NextResponse.json({ ok: true });
         }
       }
 
-      await tgSend(chatId, `Готово! Номер ${binding.phone} привязан.`);
-      await tgSend(chatId, "Теперь вам доступны профиль и заказы в боте.", {
-        reply_markup: { remove_keyboard: true },
+      await tgSend(chatId, `✅ Номер ${binding.phone} привязан.`, {
+        reply_markup: menuReplyMarkup(),
       });
-      await sendMainMenu(chatId, siteUrl);
+      await sendMainMenu(chatId);
+      return NextResponse.json({ ok: true });
+    }
+
+    if (/^\/menu(?:@\w+)?$/i.test(text) || textLooksLike(text, "меню")) {
+      await sendMainMenu(chatId);
+      return NextResponse.json({ ok: true });
+    }
+
+    if (/^\/help(?:@\w+)?$/i.test(text) || textLooksLike(text, "помощ")) {
+      await sendHelp(chatId);
+      return NextResponse.json({ ok: true });
+    }
+
+    if (/^\/catalog(?:@\w+)?$/i.test(text) || textLooksLike(text, "каталог")) {
+      await sendCatalog(chatId);
+      return NextResponse.json({ ok: true });
+    }
+
+    if (/^\/cart(?:@\w+)?$/i.test(text) || textLooksLike(text, "корзин")) {
+      await sendCart(chatId);
+      return NextResponse.json({ ok: true });
+    }
+
+    if (/^\/checkout(?:@\w+)?$/i.test(text) || textLooksLike(text, "оформ")) {
+      await checkoutFromBot(chatId, siteUrl, msg?.from);
+      return NextResponse.json({ ok: true });
+    }
+
+    if (/^\/orders(?:@\w+)?$/i.test(text) || textLooksLike(text, "мои заказы")) {
+      await sendMyOrders(chatId);
+      return NextResponse.json({ ok: true });
+    }
+
+    if (/^\/profile(?:@\w+)?$/i.test(text) || textLooksLike(text, "профил")) {
+      await sendProfile(chatId, msg?.from);
+      return NextResponse.json({ ok: true });
+    }
+
+    if (textLooksLike(text, "привязать") || textLooksLike(text, "номер")) {
+      await requestContact(chatId, "Отправьте контакт кнопкой ниже.");
+      return NextResponse.json({ ok: true });
+    }
+
+    if (textLooksLike(text, "найти заказ")) {
+      await setChatState(chatId, { type: "awaiting_order_id" });
+      await tgSend(chatId, "Отправьте номер заказа (пример: P-MLGLJ641).", {
+        reply_markup: menuReplyMarkup(),
+      });
       return NextResponse.json({ ok: true });
     }
 
     const orderMatch = text.match(/^\/order(?:@\w+)?\s+(.+)$/i);
     if (orderMatch?.[1]) {
       await sendOrderDetails(chatId, orderMatch[1], siteUrl);
-      return NextResponse.json({ ok: true });
-    }
-
-    if (/^\/orders(?:@\w+)?$/i.test(text) || /^мои\s+заказы$/i.test(text)) {
-      await sendMyOrders(chatId, siteUrl);
-      return NextResponse.json({ ok: true });
-    }
-
-    if (/^\/profile(?:@\w+)?$/i.test(text) || /^профиль$/i.test(text)) {
-      await sendProfile(chatId, msg?.from);
-      return NextResponse.json({ ok: true });
-    }
-
-    if (/^\/catalog(?:@\w+)?$/i.test(text) || /^каталог$/i.test(text)) {
-      await sendCatalogPreview(chatId, siteUrl);
-      return NextResponse.json({ ok: true });
-    }
-
-    if (/^\/menu(?:@\w+)?$/i.test(text) || /^меню$/i.test(text)) {
-      await sendMainMenu(chatId, siteUrl);
-      return NextResponse.json({ ok: true });
-    }
-
-    if (/^\/help(?:@\w+)?$/i.test(text) || /^помощь$/i.test(text)) {
-      await sendHelp(chatId);
       return NextResponse.json({ ok: true });
     }
 
@@ -620,7 +877,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true });
     }
 
-    await tgSend(chatId, "Не понял команду. Отправьте /menu или /help.");
+    await tgSend(chatId, "Не понял запрос. Используйте кнопки снизу или отправьте /menu.", {
+      reply_markup: menuReplyMarkup(),
+    });
     return NextResponse.json({ ok: true });
   } catch (error: unknown) {
     console.error("TELEGRAM_WEBHOOK_ERROR:", error);
