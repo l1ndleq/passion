@@ -3,6 +3,7 @@ import { redis } from "@/app/lib/redis";
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN!;
 const WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET || "";
+const IS_PROD = process.env.NODE_ENV === "production";
 const TELEGRAM_AUTH_STATE_PREFIX = "tg:auth:state:";
 const TELEGRAM_AUTH_CHAT_PREFIX = "tg:auth:chat:";
 const TELEGRAM_AUTH_TTL_SECONDS = 10 * 60;
@@ -45,6 +46,15 @@ async function tgSend(chatId: number | string, text: string) {
 export async function POST(req: Request) {
   try {
     // (опционально) защита секретом
+    if (IS_PROD && !WEBHOOK_SECRET) {
+      console.error("TELEGRAM_WEBHOOK_SECRET is required in production");
+      return NextResponse.json({ ok: false, error: "WEBHOOK_SECRET_REQUIRED" }, { status: 500 });
+    }
+
+    if (!BOT_TOKEN) {
+      return NextResponse.json({ ok: false, error: "BOT_TOKEN_MISSING" }, { status: 500 });
+    }
+
     if (WEBHOOK_SECRET) {
       const got = req.headers.get("x-telegram-bot-api-secret-token");
       if (got !== WEBHOOK_SECRET) {

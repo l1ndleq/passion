@@ -128,29 +128,19 @@ export async function POST(req: Request) {
         }
       : undefined;
 
-    let telegramUser: any = null;
     if (chatId && loginToken) {
-      telegramUser = await tgSend(loginToken, chatId, userText, userKeyboard);
+      await tgSend(loginToken, chatId, userText, userKeyboard);
     }
 
-    let telegramAdmin: any = null;
     if (adminToken && adminChatIds.length) {
-      telegramAdmin = await Promise.all(
+      await Promise.all(
         adminChatIds.map((cid) => tgSend(adminToken, cid, adminText, adminKeyboard))
       );
     }
 
-    return NextResponse.json({
-      ok: true,
-      debug: {
-        digits,
-        chatId: chatId ?? null,
-        telegramUser,
-        telegramAdmin,
-      },
-    });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: "STATUS_UPDATE_FAILED", message: e?.message }, { status: 500 });
+    return NextResponse.json({ ok: true });
+  } catch {
+    return NextResponse.json({ ok: false, error: "STATUS_UPDATE_FAILED" }, { status: 500 });
   }
 }
 

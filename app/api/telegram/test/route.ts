@@ -1,9 +1,23 @@
+import crypto from "crypto";
 import { NextResponse } from "next/server";
-export const runtime = "nodejs";
-import { Redis } from "@upstash/redis";
 
-export async function POST() {
+export const runtime = "nodejs";
+
+function isSafeEqual(a: string, b: string) {
+  const aBuf = Buffer.from(a);
+  const bBuf = Buffer.from(b);
+  if (aBuf.length !== bBuf.length) return false;
+  return crypto.timingSafeEqual(aBuf, bBuf);
+}
+
+export async function POST(req: Request) {
   try {
+    const adminSecret = String(process.env.ADMIN_SECRET || "");
+    const got = String(req.headers.get("x-admin-secret") || "");
+    if (!adminSecret || !got || !isSafeEqual(got, adminSecret)) {
+      return NextResponse.json({ ok: false, error: "FORBIDDEN" }, { status: 403 });
+    }
+
     const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
     const raw = process.env.TELEGRAM_CHAT_IDS || "";
 
