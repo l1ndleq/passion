@@ -1,8 +1,11 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
-const USER_SESSION_COOKIE = "passion_session";
-const ADMIN_SESSION_COOKIE = "admin_session";
+const IS_PROD = process.env.NODE_ENV === "production";
+const USER_SESSION_COOKIE = IS_PROD ? "__Host-passion_session" : "passion_session";
+const ADMIN_SESSION_COOKIE = IS_PROD ? "__Host-admin_session" : "admin_session";
+const USER_SESSION_COOKIE_NAMES = Array.from(new Set([USER_SESSION_COOKIE, "passion_session"]));
+const ADMIN_SESSION_COOKIE_NAMES = Array.from(new Set([ADMIN_SESSION_COOKIE, "admin_session"]));
 const CSRF_MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 const encoder = new TextEncoder();
@@ -63,45 +66,51 @@ async function hasValidUserSession(req: NextRequest) {
   const secret = process.env.AUTH_SECRET;
   if (!secret) return false;
 
-  const token = req.cookies.get(USER_SESSION_COOKIE)?.value;
-  if (!token) return false;
+  for (const cookieName of USER_SESSION_COOKIE_NAMES) {
+    const token = req.cookies.get(cookieName)?.value;
+    if (!token) continue;
 
-  const [body, sig] = token.split(".");
-  if (!body || !sig) return false;
+    const [body, sig] = token.split(".");
+    if (!body || !sig) continue;
 
-  const expected = await hmacSha256Base64Url(body, secret);
-  if (!isSafeEqual(expected, sig)) return false;
+    const expected = await hmacSha256Base64Url(body, secret);
+    if (!isSafeEqual(expected, sig)) continue;
 
-  try {
-    const json = JSON.parse(decodeBase64Url(body));
-    if (!json?.phone || !json?.exp) return false;
-    if (Date.now() > Number(json.exp)) return false;
-    return true;
-  } catch {
-    return false;
+    try {
+      const json = JSON.parse(decodeBase64Url(body));
+      if (!json?.phone || !json?.exp) continue;
+      if (Date.now() > Number(json.exp)) continue;
+      return true;
+    } catch {
+      continue;
+    }
   }
+  return false;
 }
 
 async function hasValidAdminSession(req: NextRequest) {
   const secret = process.env.ADMIN_SESSION_SECRET;
   if (!secret) return false;
 
-  const token = req.cookies.get(ADMIN_SESSION_COOKIE)?.value;
-  if (!token) return false;
+  for (const cookieName of ADMIN_SESSION_COOKIE_NAMES) {
+    const token = req.cookies.get(cookieName)?.value;
+    if (!token) continue;
 
-  const dot = token.lastIndexOf(".");
-  if (dot <= 0) return false;
+    const dot = token.lastIndexOf(".");
+    if (dot <= 0) continue;
 
-  const payload = token.slice(0, dot);
-  const sig = token.slice(dot + 1);
-  const parts = payload.split("|");
-  if (parts.length !== 3) return false;
+    const payload = token.slice(0, dot);
+    const sig = token.slice(dot + 1);
+    const parts = payload.split("|");
+    if (parts.length !== 3) continue;
 
-  const exp = Number(parts[1]);
-  if (!Number.isFinite(exp) || exp <= Date.now()) return false;
+    const exp = Number(parts[1]);
+    if (!Number.isFinite(exp) || exp <= Date.now()) continue;
 
-  const expected = await hmacSha256Hex(payload, secret);
-  return isSafeEqual(expected, sig);
+    const expected = await hmacSha256Hex(payload, secret);
+    if (isSafeEqual(expected, sig)) return true;
+  }
+  return false;
 }
 
 function redirectToLogin(req: NextRequest, loginPath: "/login" | "/admin/login") {

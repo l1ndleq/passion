@@ -98,13 +98,17 @@ export async function POST(req: Request) {
   const res = NextResponse.json({ ok: true, next });
   const isProd = process.env.NODE_ENV === "production";
 
-  res.cookies.set("admin_session", token, {
+  res.cookies.set(adminSessionCookieName(), token, {
     httpOnly: true,
     sameSite: "lax",
     secure: isProd,
     path: "/",
     maxAge: 60 * 60 * 24 * 7,
+    priority: "high",
   });
 
   return res;
+}
+function adminSessionCookieName() {
+  return process.env.NODE_ENV === "production" ? "__Host-admin_session" : "admin_session";
 }

@@ -1,25 +1,15 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { SESSION_COOKIE_NAME, verifySessionToken } from "@/app/lib/auth";
+import { getSessionFromCookieHeader } from "@/app/lib/auth";
 import AccountClient from "./page.client";
 import { Suspense } from "react";
 
 export const dynamic = "force-dynamic";
 
-async function readCookie(name: string) {
-  const h = await headers();
-  const cookie = h.get("cookie") || "";
-
-  const parts = cookie.split(";").map((p) => p.trim());
-  const found = parts.find((p) => p.startsWith(name + "="));
-  if (!found) return null;
-
-  return decodeURIComponent(found.slice(name.length + 1));
-}
-
 export default async function AccountPage() {
-  const token = await readCookie(SESSION_COOKIE_NAME);
-  const session = verifySessionToken(token);
+  const h = await headers();
+  const cookieHeader = h.get("cookie") || "";
+  const session = getSessionFromCookieHeader(cookieHeader);
 
   if (!session) redirect("/login");
 

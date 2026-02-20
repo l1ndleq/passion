@@ -57,6 +57,8 @@ export default function AccountClient({ phone }: { phone: string }) {
   const [ordersError, setOrdersError] = useState<string | null>(null);
 
   const [tgLinked, setTgLinked] = useState<boolean | null>(null);
+  const [tgUsername, setTgUsername] = useState<string | null>(null);
+  const [tgDisplayName, setTgDisplayName] = useState<string | null>(null);
   const [tgError, setTgError] = useState<string | null>(null);
   const [tgUnlinkLoading, setTgUnlinkLoading] = useState(false);
   const [logoutLoading, setLogoutLoading] = useState(false);
@@ -67,12 +69,15 @@ export default function AccountClient({ phone }: { phone: string }) {
   const BOT_USERNAME = sanitizeTelegramUsername(process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || "");
 
   useEffect(() => {
+    const stored = safeJson<Partial<Profile>>(localStorage.getItem(PROFILE_KEY), {});
+    const safeName = String(stored.name || "");
+    localStorage.setItem(PROFILE_KEY, JSON.stringify({ name: safeName }));
     setProfile(
-      safeJson<Profile>(localStorage.getItem(PROFILE_KEY), {
-        name: "",
+      {
+        name: safeName,
         phone: phone || "",
         email: "",
-      })
+      }
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -116,14 +121,28 @@ export default function AccountClient({ phone }: { phone: string }) {
 
         if (!r.ok || !j?.ok) {
           setTgLinked(null);
+          setTgUsername(null);
+          setTgDisplayName(null);
           setTgError("Не удалось проверить привязку Телеграма");
           return;
         }
 
         setTgLinked(Boolean(j.linked));
+        setTgUsername(
+          typeof j.username === "string" && j.username.trim()
+            ? sanitizeTelegramUsername(j.username)
+            : null
+        );
+        setTgDisplayName(
+          typeof j.displayName === "string" && j.displayName.trim()
+            ? j.displayName.trim()
+            : null
+        );
       } catch {
         if (!alive) return;
         setTgLinked(null);
+        setTgUsername(null);
+        setTgDisplayName(null);
         setTgError("Не удалось проверить привязку Телеграма");
       }
     }
@@ -143,7 +162,7 @@ export default function AccountClient({ phone }: { phone: string }) {
 
   function saveProfile(next: Profile) {
     setProfile(next);
-    localStorage.setItem(PROFILE_KEY, JSON.stringify(next));
+    localStorage.setItem(PROFILE_KEY, JSON.stringify({ name: next.name }));
   }
 
   function normalizeOrderId(v: string) {
@@ -193,6 +212,8 @@ export default function AccountClient({ phone }: { phone: string }) {
       }
 
       setTgLinked(false);
+      setTgUsername(null);
+      setTgDisplayName(null);
     } catch {
       setTgError("Не удалось отвязать Телеграм");
     } finally {
@@ -218,72 +239,6 @@ export default function AccountClient({ phone }: { phone: string }) {
         </button>
       </div>
       {logoutError ? <div className="text-xs text-red-600">{logoutError}</div> : null}
-
-      {/* Телеграм */}
-      <div className="border border-black/10 rounded-2xl bg-white/40 p-4">
-        <div className="flex items-center justify-between gap-3">
-          <div className="font-medium">Телеграм</div>
-          <button
-            onClick={() => window.location.reload()}
-            disabled={tgUnlinkLoading}
-            className="text-xs text-black/50 hover:text-black transition disabled:opacity-50"
-            type="button"
-          >
-            Обновить
-          </button>
-        </div>
-
-        {tgError ? (
-          <div className="mt-3 text-sm text-red-600">Ошибка проверки: {tgError}</div>
-        ) : tgLinked === null ? (
-          <div className="mt-3 text-sm text-black/50">Проверяем…</div>
-        ) : tgLinked ? (
-          <div className="mt-3 text-sm">
-            <span className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/60 px-3 py-1">
-              Привязан ✅
-            </span>
-            <div className="mt-2 text-xs text-black/50">
-              Уведомления о заказах будут приходить в Телеграм для этого номера.
-            </div>
-            <button
-              onClick={unlinkTelegram}
-              disabled={tgUnlinkLoading}
-              className="mt-3 rounded-xl border px-3 py-2 text-sm hover:bg-white/70 disabled:opacity-50"
-              type="button"
-            >
-              {tgUnlinkLoading ? "Отвязываем..." : "Отвязать Telegram"}
-            </button>
-          </div>
-        ) : (
-          <div className="mt-3 text-sm">
-            <span className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/60 px-3 py-1">
-              Не привязан ❌
-            </span>
-
-            <div className="mt-2 text-xs text-black/50">
-              Привяжи Телеграм — и уведомления о заказах будут приходить туда автоматически.
-            </div>
-
-            {BOT_USERNAME ? (
-              <a
-                className="tg-btn mt-3 inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm"
-                href={`https://t.me/${BOT_USERNAME}`}
-                target="_blank"
-                rel="noreferrer"
-              >
-                <span className="tg-btn__icon" aria-hidden="true">✈</span>
-                Открыть бота и привязать
-              </a>
-            ) : (
-              <div className="mt-3 text-xs text-black/50">
-                Добавьте переменную окружения{" "}
-                <code className="px-1 py-0.5 rounded bg-black/5">NEXT_PUBLIC_TELEGRAM_BOT_USERNAME</code>{" "}
-                (без @), чтобы показать кнопку.
-              </div>
-            )}
-          </div>
-        )}
-      </div>
 
       {/* Профиль */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -312,7 +267,7 @@ export default function AccountClient({ phone }: { phone: string }) {
           </div>
 
           <div className="mt-3 text-xs text-black/50">
-            Профиль сохраняется в этом браузере. Заказы — на сервере.
+            В этом браузере сохраняется только имя. Заказы - на сервере.
           </div>
         </div>
 
@@ -343,6 +298,73 @@ export default function AccountClient({ phone }: { phone: string }) {
             Номер заказа есть в Телеграме/после оформления.
           </div>
         </div>
+      </div>
+
+      {/* Телеграм */}
+      <div className="border border-black/10 rounded-2xl bg-white/40 p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div className="font-medium">Телеграм</div>
+          <button
+            onClick={() => window.location.reload()}
+            disabled={tgUnlinkLoading}
+            className="text-xs text-black/50 hover:text-black transition disabled:opacity-50"
+            type="button"
+          >
+            Обновить
+          </button>
+        </div>
+
+        {tgError ? (
+          <div className="mt-3 text-sm text-red-600">Ошибка проверки: {tgError}</div>
+        ) : tgLinked === null ? (
+          <div className="mt-3 text-sm text-black/50">Проверяем…</div>
+        ) : tgLinked ? (
+          <div className="mt-3 text-sm">
+            <span className="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-sky-700">
+              <TelegramLogoIcon className="h-4 w-4" />
+              {tgUsername ? `@${tgUsername}` : tgDisplayName || "Telegram подключен"}
+            </span>
+            <div className="mt-2 text-xs text-black/50">
+              Уведомления о заказах будут приходить в Телеграм для этого номера.
+            </div>
+            <button
+              onClick={unlinkTelegram}
+              disabled={tgUnlinkLoading}
+              className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 hover:bg-red-100 disabled:opacity-50"
+              type="button"
+            >
+              {tgUnlinkLoading ? "Отвязываем..." : "Отвязать Telegram"}
+            </button>
+          </div>
+        ) : (
+          <div className="mt-3 text-sm">
+            <span className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/60 px-3 py-1">
+              Не привязан
+            </span>
+
+            <div className="mt-2 text-xs text-black/50">
+              Привяжи Телеграм — и уведомления о заказах будут приходить туда автоматически.
+            </div>
+
+            {BOT_USERNAME ? (
+              <a
+                className="tg-btn mt-3 inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm"
+                href={`https://t.me/${BOT_USERNAME}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <TelegramLogoIcon className="h-5 w-5" />
+                Открыть бота и привязать
+              </a>
+            ) : (
+              <div className="mt-3 text-xs text-black/50">
+                Добавьте переменную окружения{" "}
+                <code className="px-1 py-0.5 rounded bg-black/5">NEXT_PUBLIC_TELEGRAM_BOT_USERNAME</code>{" "}
+                (без @), чтобы показать кнопку.
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Заказы */}
@@ -430,6 +452,23 @@ export default function AccountClient({ phone }: { phone: string }) {
         Если заказа нет в списке — проверь, что оформление делалось под этим номером телефона.
       </div>
     </div>
+  );
+}
+
+function TelegramLogoIcon({ className = "h-5 w-5" }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 240 240"
+      className={className}
+      aria-hidden="true"
+      focusable="false"
+    >
+      <circle cx="120" cy="120" r="120" fill="#4A8BD8" />
+      <path
+        fill="#FFFFFF"
+        d="M55 118c35-15 59-24 71-29 35-14 42-17 47-17 1 0 4 0 5 2 1 2 1 5 1 7-1 24-12 83-18 110-2 12-7 16-12 16-11 1-19-7-30-14-16-10-25-16-40-26-17-11-6-17 4-27 3-3 55-50 56-54 0 0 0-1-1-1s-2 0-3 1c-2 1-29 19-82 54-8 6-15 8-22 8-8 0-23-5-34-9-14-5-26-8-25-16 1-4 5-8 13-11z"
+      />
+    </svg>
   );
 }
 

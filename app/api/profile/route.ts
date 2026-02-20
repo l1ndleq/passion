@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { Redis } from "@upstash/redis";
 import { RawPhoneSchema } from "@/app/lib/inputValidation";
+import { getSessionFromRequest } from "@/app/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,8 +27,13 @@ function phoneDigits(phone: string) {
 
 export async function GET(req: Request) {
   try {
+    const session = getSessionFromRequest(req);
+    if (!session?.phone) {
+      return NextResponse.json({ ok: false, error: "UNAUTHORIZED" }, { status: 401 });
+    }
+
     const url = new URL(req.url);
-    const rawPhone = url.searchParams.get("phone") || "";
+    const rawPhone = url.searchParams.get("phone") || session.phone;
     const parsedPhone = RawPhoneSchema.safeParse(rawPhone);
     if (!parsedPhone.success) {
       return NextResponse.json({ ok: false, error: "PHONE_REQUIRED" }, { status: 400 });
@@ -35,9 +41,13 @@ export async function GET(req: Request) {
     const phone = parsedPhone.data;
     const normalized = normalizePhone(phone);
     const digits = phoneDigits(normalized);
+    const sessionDigits = phoneDigits(normalizePhone(session.phone));
 
     if (digits.length < 10) {
       return NextResponse.json({ ok: false, error: "PHONE_REQUIRED" }, { status: 400 });
+    }
+    if (!sessionDigits || sessionDigits !== digits) {
+      return NextResponse.json({ ok: false, error: "FORBIDDEN" }, { status: 403 });
     }
 
     const redis = getRedisOrThrow();
