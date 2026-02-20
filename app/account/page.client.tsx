@@ -323,9 +323,11 @@ export default function AccountClient({ phone }: { phone: string }) {
           <div className="mt-3 text-sm text-black/50">Проверяем…</div>
         ) : tgLinked ? (
           <div className="mt-3 text-sm">
-            <span className="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-sky-700">
+            <span className="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-sky-800">
               <TelegramLogoIcon className="h-4 w-4" />
-              {tgUsername ? `@${tgUsername}` : tgDisplayName || "Telegram подключен"}
+              <span className="font-medium leading-none">
+                {tgUsername ? `@${tgUsername}` : tgDisplayName || "Telegram подключен"}
+              </span>
             </span>
             <div className="mt-2 text-xs text-black/50">
               Уведомления о заказах будут приходить в Телеграм для этого номера.
@@ -351,13 +353,15 @@ export default function AccountClient({ phone }: { phone: string }) {
 
             {BOT_USERNAME ? (
               <a
-                className="tg-btn mt-3 inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm"
+                className="tg-btn mt-3 inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm"
                 href={BOT_LINK}
                 target="_blank"
                 rel="noreferrer"
               >
-                <TelegramLogoIcon className="h-5 w-5" />
-                Открыть бота и привязать
+                <span className="tg-btn__icon" aria-hidden="true">
+                  <TelegramLogoIcon className="h-4 w-4" />
+                </span>
+                <span className="leading-none">Открыть бота и привязать</span>
               </a>
             ) : (
               <div className="mt-3 text-xs text-black/50">
@@ -459,19 +463,19 @@ export default function AccountClient({ phone }: { phone: string }) {
 }
 
 function TelegramLogoIcon({ className = "h-5 w-5" }: { className?: string }) {
-  const iconClassName = `${className} block shrink-0 -translate-y-px`;
+  const iconClassName = `${className} block shrink-0`;
 
   return (
     <svg
-      viewBox="0 0 240 240"
+      viewBox="0 0 24 24"
       className={iconClassName}
       aria-hidden="true"
       focusable="false"
     >
-      <circle cx="120" cy="120" r="120" fill="#4A8BD8" />
+      <circle cx="12" cy="12" r="12" fill="#2AABEE" />
       <path
         fill="#FFFFFF"
-        d="M55 118c35-15 59-24 71-29 35-14 42-17 47-17 1 0 4 0 5 2 1 2 1 5 1 7-1 24-12 83-18 110-2 12-7 16-12 16-11 1-19-7-30-14-16-10-25-16-40-26-17-11-6-17 4-27 3-3 55-50 56-54 0 0 0-1-1-1s-2 0-3 1c-2 1-29 19-82 54-8 6-15 8-22 8-8 0-23-5-34-9-14-5-26-8-25-16 1-4 5-8 13-11z"
+        d="M17.34 7.31 6.12 11.64c-.77.31-.76.74-.14.93l2.88.9 1.11 3.44c.13.36.07.51.45.51.29 0 .42-.13.58-.28l1.39-1.35 2.89 2.13c.53.29.91.14 1.04-.5l1.9-8.96c.2-.78-.3-1.13-.88-.88Zm-1.66 1.58-4.93 4.45-.19 2.1-.87-2.73 5.99-3.82Z"
       />
     </svg>
   );
