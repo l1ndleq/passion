@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { redis } from "@/app/lib/redis";
 
-const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN!;
+const BOT_TOKEN =
+  String(process.env.TELEGRAM_LOGIN_BOT_TOKEN || "").trim() ||
+  String(process.env.TELEGRAM_BOT_TOKEN || "").trim();
 const WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET || "";
 const IS_PROD = process.env.NODE_ENV === "production";
 const TELEGRAM_AUTH_STATE_PREFIX = "tg:auth:state:";
@@ -52,7 +54,7 @@ export async function POST(req: Request) {
     }
 
     if (!BOT_TOKEN) {
-      return NextResponse.json({ ok: false, error: "BOT_TOKEN_MISSING" }, { status: 500 });
+      return NextResponse.json({ ok: false, error: "LOGIN_BOT_TOKEN_MISSING" }, { status: 500 });
     }
 
     if (WEBHOOK_SECRET) {

@@ -18,7 +18,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "FORBIDDEN" }, { status: 403 });
     }
 
-    const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+    const BOT_TOKEN =
+      String(process.env.TELEGRAM_ADMIN_BOT_TOKEN || "").trim() ||
+      String(process.env.TELEGRAM_BOT_TOKEN || "").trim();
     const raw = process.env.TELEGRAM_CHAT_IDS || "";
 
     const CHAT_IDS = raw
@@ -28,7 +30,7 @@ export async function POST(req: Request) {
 
     if (!BOT_TOKEN) {
       return NextResponse.json(
-        { ok: false, error: "Missing TELEGRAM_BOT_TOKEN" },
+        { ok: false, error: "Missing TELEGRAM_ADMIN_BOT_TOKEN" },
         { status: 500 }
       );
     }
