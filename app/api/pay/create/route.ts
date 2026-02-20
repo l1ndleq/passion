@@ -4,6 +4,12 @@ import { Redis } from "@upstash/redis";
 import { rateLimit } from "../../../../src/lib/rateLimit";
 import { PRODUCTS } from "../../../lib/products";
 import { buildOrderTrackingUrl } from "@/app/lib/orderAccess";
+import {
+  normalizePromoCode,
+  promoCodeKey,
+  sanitizePromoRecord,
+  validatePromoForSubtotal,
+} from "@/app/lib/promocodes";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -49,6 +55,14 @@ type CreatePayBody = {
   }>;
   totalPrice?: number; // игнорируем, считаем сами
   delivery?: Delivery | null;
+  promoCode?: string;
+};
+
+type DiscountInfo = {
+  code: string;
+  type: "percent" | "fixed";
+  value: number;
+  amount: number;
 };
 
 function getRedisOrThrow() {
@@ -412,8 +426,8 @@ export async function POST(req: Request) {
       };
     });
 
-    const totalPrice = serverItems.reduce((sum, it) => sum + it.price * it.qty, 0);
-    if (!Number.isFinite(totalPrice) || totalPrice <= 0) {
+    const subtotalPrice = serverItems.reduce((sum, it) => sum + it.price * it.qty, 0);
+    if (!Number.isFinite(subtotalPrice) || subtotalPrice <= 0) {
       return NextResponse.json(
         { ok: false, error: "TOTAL_INVALID" },
         { status: 400 }
@@ -451,6 +465,38 @@ export async function POST(req: Request) {
     const telegram = telegramRaw.replace(/^@/, "");
 
     const delivery = normalizeDelivery(body.delivery);
+    const redis = getRedisOrThrow();
+
+    const promoCode = normalizePromoCode(body.promoCode);
+    let totalPrice = subtotalPrice;
+    let discount: DiscountInfo | null = null;
+    let promoForUpdate: ReturnType<typeof sanitizePromoRecord> = null;
+
+    if (promoCode) {
+      const promo = sanitizePromoRecord(await redis.get(promoCodeKey(promoCode)));
+      const promoValidation = validatePromoForSubtotal(promo, subtotalPrice);
+
+      if (!promoValidation.ok) {
+        const error =
+          promoValidation.reason === "inactive"
+            ? "PROMO_INACTIVE"
+            : promoValidation.reason === "expired"
+            ? "PROMO_EXPIRED"
+            : promoValidation.reason === "usage_limit"
+            ? "PROMO_USAGE_LIMIT"
+            : "PROMO_INVALID";
+        return NextResponse.json({ ok: false, error }, { status: 400 });
+      }
+
+      discount = {
+        code: promo!.code,
+        type: promo!.type,
+        value: promo!.value,
+        amount: promoValidation.discountAmount,
+      };
+      totalPrice = promoValidation.totalPrice;
+      promoForUpdate = promo;
+    }
 
     const mergedCustomer = {
       ...customer,
@@ -475,11 +521,12 @@ export async function POST(req: Request) {
       ],
       customer: mergedCustomer,
       items,
+      subtotalPrice,
       totalPrice,
+      discount,
+      promoCode: discount?.code || null,
       delivery,
     };
-
-    const redis = getRedisOrThrow();
 
     const PROFILE_TTL_SECONDS = 60 * 60 * 24 * 365; // 1 год
     await redis.set(
@@ -501,6 +548,14 @@ export async function POST(req: Request) {
 
     await redis.lpush(`user:orders:${digits}`, orderId);
     await redis.ltrim(`user:orders:${digits}`, 0, 199);
+
+    if (promoForUpdate && discount) {
+      await redis.set(promoCodeKey(promoForUpdate.code), {
+        ...promoForUpdate,
+        usedCount: Math.max(0, Number(promoForUpdate.usedCount || 0)) + 1,
+        updatedAt: Date.now(),
+      });
+    }
 
     const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000")
       .replace(/\/+$/, "");

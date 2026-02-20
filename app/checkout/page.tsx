@@ -9,6 +9,7 @@ type CheckoutForm = {
   name: string;
   phone: string;
   telegram?: string;
+  promoCode?: string;
   city?: string;
   address?: string;
   comment?: string;
@@ -37,6 +38,7 @@ export default function CheckoutPage() {
     name: "",
     phone: "",
     telegram: "",
+    promoCode: "",
     city: "",
     address: "",
     comment: "",
@@ -124,6 +126,21 @@ export default function CheckoutPage() {
     return null;
   }
 
+  function localizeCheckoutError(code: string) {
+    switch (code) {
+      case "PROMO_INVALID":
+        return "Промокод не найден или недействителен";
+      case "PROMO_INACTIVE":
+        return "Промокод отключен";
+      case "PROMO_EXPIRED":
+        return "Срок действия промокода истек";
+      case "PROMO_USAGE_LIMIT":
+        return "Лимит применений промокода исчерпан";
+      default:
+        return code;
+    }
+  }
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -156,6 +173,7 @@ export default function CheckoutPage() {
             address: (form.address || "").trim(),
             message: (form.comment || "").trim(),
           },
+          promoCode: String(form.promoCode || "").trim() || null,
           items: items.map((i) => ({
             id: i.id,
             title: i.name,
@@ -179,7 +197,10 @@ export default function CheckoutPage() {
       });
 
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.error || data?.message || "Не удалось создать заказ");
+      if (!res.ok) {
+        const code = String(data?.error || data?.message || "Не удалось создать заказ");
+        throw new Error(localizeCheckoutError(code));
+      }
 
       clearCart();
 
@@ -242,6 +263,14 @@ export default function CheckoutPage() {
               placeholder="Телеграм (необязательно)"
               value={form.telegram || ""}
               onChange={(e) => setField("telegram", e.target.value)}
+              disabled={submitting}
+            />
+
+            <input
+              className="h-12 rounded-xl border border-neutral-200 px-4 text-sm outline-none focus:border-neutral-400"
+              placeholder="Промокод (если есть)"
+              value={form.promoCode || ""}
+              onChange={(e) => setField("promoCode", e.target.value)}
               disabled={submitting}
             />
 
