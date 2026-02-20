@@ -1088,12 +1088,27 @@ export async function POST(req: Request) {
 
     if (/^\/admin(?:@\w+)?$/i.test(text) || textLooksLike(text, "админ")) {
       if (!isKnownAdminChat(chatId)) {
-        await tgSend(chatId, "Доступ к админке запрещен.", {
-          reply_markup: menuReplyMarkup(),
-        });
+        await tgSend(
+          chatId,
+          `Доступ к админке запрещен.\nВаш chat_id: ${asChatIdString(chatId)}\nДобавьте его в TELEGRAM_CHAT_IDS и сделайте redeploy.`,
+          {
+            reply_markup: menuReplyMarkup(),
+          }
+        );
         return NextResponse.json({ ok: true });
       }
       await sendAdminMenu(chatId);
+      return NextResponse.json({ ok: true });
+    }
+
+    if (/^\/myid(?:@\w+)?$/i.test(text)) {
+      await tgSend(
+        chatId,
+        `chat_id: ${asChatIdString(chatId)}\nadmin_access: ${isKnownAdminChat(chatId) ? "yes" : "no"}`,
+        {
+          reply_markup: menuReplyMarkup(),
+        }
+      );
       return NextResponse.json({ ok: true });
     }
 
