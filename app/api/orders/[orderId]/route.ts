@@ -5,6 +5,7 @@ import {
   ORDER_ACCESS_QUERY_PARAM,
   verifyOrderAccessToken,
 } from "@/app/lib/orderAccess";
+import { OrderIdSchema } from "@/app/lib/inputValidation";
 
 export const runtime = "nodejs";
 
@@ -40,11 +41,12 @@ export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
     const parts = url.pathname.split("/").filter(Boolean);
-    const orderId = (parts[parts.length - 1] || "").trim();
+    const parsedOrderId = OrderIdSchema.safeParse(parts[parts.length - 1] || "");
 
-    if (!orderId) {
+    if (!parsedOrderId.success) {
       return NextResponse.json({ ok: false, error: "ORDER_ID_REQUIRED" }, { status: 400 });
     }
+    const orderId = parsedOrderId.data;
 
     const order = await redis.get<StoredOrder>(`order:${orderId}`);
     if (!order) {

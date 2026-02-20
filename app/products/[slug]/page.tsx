@@ -3,6 +3,7 @@ import Image from "next/image";
 import { notFound } from "next/navigation";
 
 import { PRODUCTS } from "@/app/lib/products";
+import { sanitizeImageSrc } from "@/app/lib/xss";
 import AddToCartButton from "@/components/add-to-cart-button";
 import ProductsGridClient from "@/components/ProductsGridClient";
 import ProductDetails from "@/components/ProductDetails";
@@ -16,6 +17,7 @@ export default async function ProductPage({
 
   const product = PRODUCTS.find((p) => p.id === slug);
   if (!product) return notFound();
+  const safeImage = sanitizeImageSrc(product.image, "/images/placeholder-product.jpg");
 
   const others = PRODUCTS.filter((p) => p.id !== slug).slice(0, 3);
 
@@ -40,7 +42,7 @@ export default async function ProductPage({
         <div className="md:col-span-7">
           <div className="overflow-hidden rounded-3xl border border-black/10 bg-white">
             <Image
-              src={product.image || "/images/placeholder-product.jpg"}
+              src={safeImage}
               alt={product.title}
               width={1200}
               height={1500}

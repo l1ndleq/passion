@@ -4,6 +4,7 @@ import {
   isTelegramGatewayConfigured,
   sendOtpViaTelegramGateway,
 } from "@/app/lib/telegramGateway";
+import { RawPhoneSchema } from "@/app/lib/inputValidation";
 
 // Заглушка SMS.
 async function sendSms() {
@@ -13,7 +14,11 @@ async function sendSms() {
 export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({}));
-    const phoneRaw = String(body?.phone || "");
+    const parsedPhone = RawPhoneSchema.safeParse(body?.phone ?? "");
+    if (!parsedPhone.success) {
+      return NextResponse.json({ ok: false, error: "PHONE_INVALID" }, { status: 400 });
+    }
+    const phoneRaw = parsedPhone.data;
 
     const { phone: phoneNormalized, code, ttlSeconds } = await requestOtp(phoneRaw);
 

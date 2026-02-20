@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useMemo } from "react";
 import { useSearchParams } from "next/navigation";
+import { sanitizeImageSrc } from "@/app/lib/xss";
 
 type Product = {
   id?: string;
@@ -71,9 +72,11 @@ export default function ProductsGridClient({ products }: { products: Product[] }
           if (!id) return null;
 
           const title = p.name || p.title || "Товар";
+          const safeImage = sanitizeImageSrc(p.image, "/products/placeholder.jpg");
+          const safeId = encodeURIComponent(String(id));
 
           return (
-            <Link key={id} href={`/products/${id}`} className="group block">
+            <Link key={id} href={`/products/${safeId}`} className="group block">
               <div className="relative overflow-hidden rounded-3xl bg-black/[0.04]">
                 {p.badge ? (
                   <div className="absolute left-4 top-4 z-10 rounded-full bg-white/80 px-3 py-1 text-[10px] font-semibold tracking-[0.18em] uppercase">
@@ -83,7 +86,7 @@ export default function ProductsGridClient({ products }: { products: Product[] }
 
                 <div className="relative aspect-[4/3] w-full">
                   <Image
-                    src={p.image || "/products/placeholder.jpg"}
+                    src={safeImage}
                     alt={title}
                     fill
                     className="object-cover transition-transform duration-500 group-hover:scale-[1.02]"

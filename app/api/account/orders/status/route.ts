@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { Redis } from "@upstash/redis";
 import { buildOrderTrackingUrl } from "@/app/lib/orderAccess";
+import { OrderIdSchema, OrderStatusSchema } from "@/app/lib/inputValidation";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -69,11 +70,17 @@ export async function POST(req: Request) {
     }
 
     const body = (await req.json().catch(() => ({}))) as Body;
-    const orderId = String(body.orderId || "").trim();
-    const status = String(body.status || "").trim();
+    const parsedOrderId = OrderIdSchema.safeParse(body.orderId ?? "");
+    const parsedStatus = OrderStatusSchema.safeParse(body.status ?? "");
 
-    if (!orderId) return NextResponse.json({ ok: false, error: "ORDER_ID_REQUIRED" }, { status: 400 });
-    if (!status) return NextResponse.json({ ok: false, error: "STATUS_REQUIRED" }, { status: 400 });
+    if (!parsedOrderId.success) {
+      return NextResponse.json({ ok: false, error: "ORDER_ID_REQUIRED" }, { status: 400 });
+    }
+    if (!parsedStatus.success) {
+      return NextResponse.json({ ok: false, error: "STATUS_REQUIRED" }, { status: 400 });
+    }
+    const orderId = parsedOrderId.data;
+    const status = parsedStatus.data;
 
     const redis = getRedis();
     const order: any = await redis.get(`order:${orderId}`);

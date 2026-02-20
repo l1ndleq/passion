@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { redis } from "@/app/lib/redis";
+import { OrderIdSchema, OrderStatusSchema } from "@/app/lib/inputValidation";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -14,18 +15,20 @@ export async function POST(req: Request) {
   try {
     const pathname = new URL(req.url).pathname; // /api/admin/orders/P-XXX/status
     const parts = pathname.split("/").filter(Boolean);
-    const orderId = (parts[parts.length - 2] || "").trim();
+    const parsedOrderId = OrderIdSchema.safeParse(parts[parts.length - 2] || "");
 
-    if (!orderId) {
+    if (!parsedOrderId.success) {
       return NextResponse.json({ ok: false, error: "ORDER_ID_REQUIRED" }, { status: 400 });
     }
+    const orderId = parsedOrderId.data;
 
     const body = await req.json().catch(() => ({}));
-    const status = String(body?.status || "").trim();
+    const parsedStatus = OrderStatusSchema.safeParse(body?.status ?? "");
 
-    if (!status) {
+    if (!parsedStatus.success) {
       return NextResponse.json({ ok: false, error: "STATUS_REQUIRED" }, { status: 400 });
     }
+    const status = parsedStatus.data;
 
     const key = `order:${orderId}`;
     const order = await redis.get<any>(key);

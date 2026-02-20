@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { Redis } from "@upstash/redis";
+import { RawPhoneSchema } from "@/app/lib/inputValidation";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,7 +27,12 @@ function phoneDigits(phone: string) {
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
-    const phone = url.searchParams.get("phone") || "";
+    const rawPhone = url.searchParams.get("phone") || "";
+    const parsedPhone = RawPhoneSchema.safeParse(rawPhone);
+    if (!parsedPhone.success) {
+      return NextResponse.json({ ok: false, error: "PHONE_REQUIRED" }, { status: 400 });
+    }
+    const phone = parsedPhone.data;
     const normalized = normalizePhone(phone);
     const digits = phoneDigits(normalized);
 

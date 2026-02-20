@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { sanitizeImageSrc } from "@/app/lib/xss";
 
 type CartLine = {
   id: string;
@@ -23,6 +24,7 @@ export function CartItem({
   onRemove: () => void;
 }) {
   const lineTotal = item.price * item.qty;
+  const safeImage = sanitizeImageSrc(item.image, "/images/placeholder-product.jpg");
 
   return (
     <div className="rounded-2xl border bg-white/60 backdrop-blur p-4 shadow-sm">
@@ -30,7 +32,7 @@ export function CartItem({
         <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl border bg-white">
           {item.image ? (
             <Image
-              src={item.image}
+              src={safeImage}
               alt={item.title}
               fill
               className="object-cover"

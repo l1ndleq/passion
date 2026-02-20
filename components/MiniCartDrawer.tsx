@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useEffect } from "react";
 import { useCart } from "@/components/cart/CartProvider";
+import { sanitizeImageSrc } from "@/app/lib/xss";
 
 function money(n: number) {
   try {
@@ -140,6 +141,7 @@ function DrawerContent({
           <div className="space-y-3">
             {list.map((it: any) => {
               const isNew = it.id === highlightId;
+              const safeImage = sanitizeImageSrc(it.image, "/images/placeholder-product.jpg");
               return (
                 <div
                   key={it.id}
@@ -152,7 +154,7 @@ function DrawerContent({
                   <div className="flex gap-3">
                     <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-black/[0.03]">
                       <Image
-                        src={it.image || "/images/placeholder-product.jpg"}
+                        src={safeImage}
                         alt={it.name}
                         fill
                         className="object-cover"

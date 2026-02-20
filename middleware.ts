@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 const USER_SESSION_COOKIE = "passion_session";
 const ADMIN_SESSION_COOKIE = "admin_session";
+const CSRF_MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 const encoder = new TextEncoder();
 
@@ -116,8 +117,44 @@ function unauthorizedJson() {
   return NextResponse.json({ ok: false, error: "UNAUTHORIZED" }, { status: 401 });
 }
 
+function csrfForbiddenJson() {
+  return NextResponse.json({ ok: false, error: "CSRF_FORBIDDEN" }, { status: 403 });
+}
+
+function isCsrfExemptPath(pathname: string) {
+  return pathname.startsWith("/api/pay/webhook") || pathname.startsWith("/api/telegram/webhook");
+}
+
+function isTrustedInternalRequest(req: NextRequest) {
+  const expected = String(process.env.ADMIN_SECRET || "");
+  const got = String(req.headers.get("x-admin-secret") || "");
+  return Boolean(expected) && Boolean(got) && isSafeEqual(expected, got);
+}
+
+function hasSameOrigin(req: NextRequest) {
+  const ownOrigin = req.nextUrl.origin;
+  const origin = req.headers.get("origin");
+  if (origin) return origin === ownOrigin;
+
+  const referer = req.headers.get("referer");
+  if (!referer) return false;
+
+  try {
+    return new URL(referer).origin === ownOrigin;
+  } catch {
+    return false;
+  }
+}
+
 export async function middleware(req: NextRequest) {
   const pathname = req.nextUrl.pathname;
+  const isApi = pathname.startsWith("/api/");
+
+  if (isApi && CSRF_MUTATING_METHODS.has(req.method)) {
+    if (!isCsrfExemptPath(pathname) && !isTrustedInternalRequest(req) && !hasSameOrigin(req)) {
+      return csrfForbiddenJson();
+    }
+  }
 
   const isUserPage = pathname.startsWith("/account") || pathname.startsWith("/my-orders");
   const isUserApi = pathname.startsWith("/api/account");
@@ -171,6 +208,7 @@ export async function middleware(req: NextRequest) {
 
 export const config = {
   matcher: [
+    "/api/:path*",
     "/login",
     "/account/:path*",
     "/my-orders/:path*",

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { sanitizeTelegramUsername } from "@/app/lib/xss";
 
 type Profile = { name: string; phone: string; email: string };
 
@@ -63,7 +64,7 @@ export default function AccountClient({ phone }: { phone: string }) {
 
   const [trackValue, setTrackValue] = useState("");
 
-  const BOT_USERNAME = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || "";
+  const BOT_USERNAME = sanitizeTelegramUsername(process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || "");
 
   useEffect(() => {
     setProfile(
@@ -411,10 +412,10 @@ export default function AccountClient({ phone }: { phone: string }) {
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <Link
-                      href={`/order/${o.orderId}`}
-                      className="rounded-xl border px-3 py-2 text-sm hover:bg-white/70"
-                    >
+                      <Link
+                        href={`/order/${encodeURIComponent(String(o.orderId || ""))}`}
+                        className="rounded-xl border px-3 py-2 text-sm hover:bg-white/70"
+                      >
                       Открыть
                     </Link>
                   </div>

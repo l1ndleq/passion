@@ -47,7 +47,7 @@ export default function MyOrdersClient() {
               </div>
 
               <Link
-                href={`/order/${x.orderId}`}
+                href={`/order/${encodeURIComponent(String(x.orderId || ""))}`}
                 className="border rounded-xl px-4 py-2 text-sm hover:bg-neutral-50"
               >
                 Открыть

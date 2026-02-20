@@ -1,19 +1,21 @@
 import { NextResponse } from "next/server";
 import { redis } from "@/app/lib/redis";
+import { OrderIdSchema } from "@/app/lib/inputValidation";
 
 export async function GET(req: Request) {
   try {
     // надёжно достаём orderId из URL
     const pathname = new URL(req.url).pathname;
     const parts = pathname.split("/").filter(Boolean);
-    const orderId = (parts[parts.length - 1] || "").trim();
+    const parsedOrderId = OrderIdSchema.safeParse(parts[parts.length - 1] || "");
 
-    if (!orderId) {
+    if (!parsedOrderId.success) {
       return NextResponse.json(
         { ok: false, error: "ORDER_ID_REQUIRED" },
         { status: 400 }
       );
     }
+    const orderId = parsedOrderId.data;
 
     // ⬇️ КЛЮЧ В REDIS
     const order = await redis.get(`order:${orderId}`);

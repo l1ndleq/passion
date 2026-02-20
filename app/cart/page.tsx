@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useCart } from "@/components/cart/CartProvider";
+import { sanitizeImageSrc } from "@/app/lib/xss";
 
 export default function CartPage() {
   const { items, removeItem, setQty, total } = useCart();
@@ -56,16 +57,18 @@ export default function CartPage() {
       <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
         {/* Items */}
         <section className="space-y-3">
-          {items.map((i) => (
-            <div
-              key={i.id}
-              className="rounded-2xl border bg-white/60 backdrop-blur p-4 shadow-sm"
-            >
-              <div className="flex gap-4">
+          {items.map((i) => {
+            const safeImage = sanitizeImageSrc(i.image, "/images/placeholder-product.jpg");
+            return (
+              <div
+                key={i.id}
+                className="rounded-2xl border bg-white/60 backdrop-blur p-4 shadow-sm"
+              >
+                <div className="flex gap-4">
                 {/* Image (если появится позже) */}
                 <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl border bg-neutral-50">
                   <Image
-                    src={i.image || "/images/placeholder-product.jpg"}
+                    src={safeImage}
                     alt={(i as any).title || (i as any).name || "Товар"}
                     fill
                     className="object-cover"
@@ -121,9 +124,10 @@ export default function CartPage() {
                     </div>
                   </div>
                 </div>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </section>
 
         {/* Summary */}

@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ReactNode } from "react";
+import { sanitizeImageSrc } from "@/app/lib/xss";
 
 export type Product = {
   id: string;
@@ -31,7 +32,7 @@ export function ProductCard({
   badge,
   actions,
 }: ProductCardProps) {
-  const img = image?.trim() || "/images/placeholder-product.jpg";
+  const img = sanitizeImageSrc(image, "/images/placeholder-product.jpg");
 
   return (
     <div className="group flex flex-col">
