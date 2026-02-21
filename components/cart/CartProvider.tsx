@@ -10,14 +10,23 @@ export type CartItem = {
   image?: string;
 };
 
+function normalizePromoCode(raw: string) {
+  const code = String(raw || "").trim().toUpperCase();
+  if (!code) return "";
+  if (!/^[A-Z0-9_-]{3,32}$/.test(code)) return "";
+  return code;
+}
+
 type CartContextValue = {
   items: CartItem[];
   total: number;
   count: number;
+  promoCode: string | null;
 
   addItem: (item: Omit<CartItem, "qty">, qty?: number) => void;
   removeItem: (id: string) => void;
   setQty: (id: string, qty: number) => void;
+  setPromoCode: (code: string | null) => void;
   clearCart: () => void;
 
   // ✅ mini-cart drawer
@@ -34,6 +43,7 @@ const LS_KEY = "passion_cart_v1";
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
+  const [promoCode, setPromoCodeState] = useState<string | null>(null);
 
   // drawer state
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -44,15 +54,35 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       const raw = localStorage.getItem(LS_KEY);
       if (!raw) return;
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) setItems(parsed);
+      if (Array.isArray(parsed)) {
+        setItems(parsed);
+        setPromoCodeState(null);
+        return;
+      }
+      if (parsed && typeof parsed === "object") {
+        const nextItems = Array.isArray((parsed as { items?: unknown }).items)
+          ? ((parsed as { items: CartItem[] }).items || [])
+          : [];
+        const nextPromo = normalizePromoCode(
+          String((parsed as { promoCode?: string | null }).promoCode || "")
+        );
+        setItems(nextItems);
+        setPromoCodeState(nextPromo || null);
+      }
     } catch {}
   }, []);
 
   useEffect(() => {
     try {
-      localStorage.setItem(LS_KEY, JSON.stringify(items));
+      localStorage.setItem(
+        LS_KEY,
+        JSON.stringify({
+          items,
+          promoCode: promoCode || null,
+        })
+      );
     } catch {}
-  }, [items]);
+  }, [items, promoCode]);
 
   const addItem: CartContextValue["addItem"] = (item, qty = 1) => {
     setItems((prev) => {
@@ -78,9 +108,15 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const clearCart = () => {
     setItems([]);
+    setPromoCodeState(null);
     try {
       localStorage.removeItem(LS_KEY);
     } catch {}
+  };
+
+  const setPromoCode: CartContextValue["setPromoCode"] = (code) => {
+    const next = normalizePromoCode(String(code || ""));
+    setPromoCodeState(next || null);
   };
 
   const total = useMemo(() => items.reduce((s, x) => s + x.price * x.qty, 0), [items]);
@@ -99,9 +135,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       items,
       total,
       count,
+      promoCode,
       addItem,
       removeItem,
       setQty,
+      setPromoCode,
       clearCart,
 
       drawerOpen,
@@ -110,7 +148,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       lastAddedId,
       notifyAdded,
     }),
-    [items, total, count, drawerOpen, lastAddedId]
+    [items, total, count, promoCode, drawerOpen, lastAddedId]
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

@@ -1,12 +1,122 @@
 "use client";
 
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useCart } from "@/components/cart/CartProvider";
 import { sanitizeImageSrc } from "@/app/lib/xss";
 
 export default function CartPage() {
-  const { items, removeItem, setQty, total } = useCart();
+  const { items, removeItem, setQty, total, promoCode, setPromoCode } = useCart();
+  const [promoInput, setPromoInput] = useState(promoCode || "");
+  const [promoLoading, setPromoLoading] = useState(false);
+  const [promoError, setPromoError] = useState<string | null>(null);
+  const [promoInfo, setPromoInfo] = useState<string | null>(null);
+  const [discountAmount, setDiscountAmount] = useState(0);
+  const [totalWithDiscount, setTotalWithDiscount] = useState(total);
+
+  function localizePromoError(code: string) {
+    switch (code) {
+      case "PROMO_INVALID":
+        return "Промокод не найден или недействителен";
+      case "PROMO_INACTIVE":
+        return "Промокод отключен";
+      case "PROMO_EXPIRED":
+        return "Срок действия промокода истек";
+      case "PROMO_USAGE_LIMIT":
+        return "Лимит применений промокода исчерпан";
+      default:
+        return "Не удалось применить промокод";
+    }
+  }
+
+  const previewPromo = useCallback(async (code: string) => {
+    const res = await fetch("/api/promo/preview", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        promoCode: code || null,
+        subtotalPrice: total,
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    return { res, data } as const;
+  }, [total]);
+
+  async function applyPromo() {
+    setPromoError(null);
+    setPromoInfo(null);
+
+    const code = String(promoInput || "").trim().toUpperCase();
+    if (!code) {
+      setPromoCode(null);
+      setDiscountAmount(0);
+      setTotalWithDiscount(total);
+      setPromoInfo("Промокод убран");
+      return;
+    }
+
+    setPromoLoading(true);
+    try {
+      const { res, data } = await previewPromo(code);
+      if (!res.ok || !data?.ok) {
+        setPromoCode(null);
+        setDiscountAmount(0);
+        setTotalWithDiscount(total);
+        setPromoError(localizePromoError(String(data?.error || "")));
+        return;
+      }
+
+      setPromoCode(code);
+      setDiscountAmount(Math.max(0, Number(data?.discountAmount || 0)));
+      setTotalWithDiscount(Math.max(1, Number(data?.totalPrice || total)));
+      setPromoInfo(`Промокод ${code} применен`);
+    } catch {
+      setPromoError("Ошибка сети при проверке промокода");
+    } finally {
+      setPromoLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    setPromoInput(promoCode || "");
+  }, [promoCode]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      if (!promoCode) {
+        setDiscountAmount(0);
+        setTotalWithDiscount(total);
+        return;
+      }
+
+      try {
+        const { res, data } = await previewPromo(promoCode);
+        if (cancelled) return;
+
+        if (!res.ok || !data?.ok) {
+          setPromoCode(null);
+          setDiscountAmount(0);
+          setTotalWithDiscount(total);
+          setPromoError(localizePromoError(String(data?.error || "")));
+          return;
+        }
+
+        setDiscountAmount(Math.max(0, Number(data?.discountAmount || 0)));
+        setTotalWithDiscount(Math.max(1, Number(data?.totalPrice || total)));
+      } catch {
+        if (cancelled) return;
+        setDiscountAmount(0);
+        setTotalWithDiscount(total);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [promoCode, previewPromo, total, setPromoCode]);
 
   if (!items.length) {
     return (
@@ -144,6 +254,11 @@ export default function CartPage() {
                 <span className="tabular-nums">{total} ₽</span>
               </div>
 
+              <div className="flex justify-between">
+                <span>Скидка</span>
+                <span className="tabular-nums">{discountAmount ? `−${discountAmount} ₽` : "0 ₽"}</span>
+              </div>
+
               <div className="flex justify-between text-neutral-500">
                 <span>Доставка</span>
                 <span>рассчитаем позже</span>
@@ -153,8 +268,35 @@ export default function CartPage() {
 
               <div className="flex justify-between text-base font-semibold">
                 <span>К оплате</span>
-                <span className="tabular-nums">{total} ₽</span>
+                <span className="tabular-nums">{totalWithDiscount} ₽</span>
               </div>
+            </div>
+
+            <div className="mt-4">
+              <label className="mb-1 block text-xs text-neutral-600">Промокод</label>
+              <div className="flex gap-2">
+                <input
+                  className="h-11 flex-1 rounded-xl border border-neutral-200 px-3 text-sm uppercase outline-none focus:border-neutral-400"
+                  placeholder="Например, WELCOME10"
+                  value={promoInput}
+                  onChange={(e) => setPromoInput(e.target.value)}
+                  disabled={promoLoading}
+                />
+                <button
+                  type="button"
+                  onClick={applyPromo}
+                  disabled={promoLoading}
+                  className="h-11 rounded-xl border border-black px-4 text-sm font-medium hover:bg-neutral-50 disabled:opacity-60"
+                >
+                  {promoLoading ? "..." : "Применить"}
+                </button>
+              </div>
+              {promoError ? (
+                <div className="mt-2 text-xs text-red-600">{promoError}</div>
+              ) : null}
+              {!promoError && promoInfo ? (
+                <div className="mt-2 text-xs text-emerald-700">{promoInfo}</div>
+              ) : null}
             </div>
 
             <Link

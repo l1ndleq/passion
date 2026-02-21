@@ -9,7 +9,6 @@ type CheckoutForm = {
   name: string;
   phone: string;
   telegram?: string;
-  promoCode?: string;
   city?: string;
   address?: string;
   comment?: string;
@@ -32,13 +31,12 @@ type Delivery = {
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const { items, total, clearCart } = useCart();
+  const { items, total, promoCode, clearCart } = useCart();
 
   const [form, setForm] = useState<CheckoutForm>({
     name: "",
     phone: "",
     telegram: "",
-    promoCode: "",
     city: "",
     address: "",
     comment: "",
@@ -173,7 +171,7 @@ export default function CheckoutPage() {
             address: (form.address || "").trim(),
             message: (form.comment || "").trim(),
           },
-          promoCode: String(form.promoCode || "").trim() || null,
+          promoCode: promoCode || null,
           items: items.map((i) => ({
             id: i.id,
             title: i.name,
@@ -263,14 +261,6 @@ export default function CheckoutPage() {
               placeholder="Телеграм (необязательно)"
               value={form.telegram || ""}
               onChange={(e) => setField("telegram", e.target.value)}
-              disabled={submitting}
-            />
-
-            <input
-              className="h-12 rounded-xl border border-neutral-200 px-4 text-sm outline-none focus:border-neutral-400"
-              placeholder="Промокод (если есть)"
-              value={form.promoCode || ""}
-              onChange={(e) => setField("promoCode", e.target.value)}
               disabled={submitting}
             />
 
