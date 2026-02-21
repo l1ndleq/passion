@@ -1,10 +1,11 @@
 /** @type {import('next').NextConfig} */
 const isProd = process.env.NODE_ENV === "production";
+// Allow unsafe-inline for scripts and styles to support Next.js hydration and Framer Motion
 const scriptSrc = isProd
-  ? "script-src 'self' https:"
+  ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https:"
   : "script-src 'self' 'unsafe-inline' 'unsafe-eval' https:";
 const styleSrc = isProd
-  ? "style-src 'self' https:"
+  ? "style-src 'self' 'unsafe-inline' https:"
   : "style-src 'self' 'unsafe-inline' https:";
 
 const csp = [
