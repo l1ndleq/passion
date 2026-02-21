@@ -51,9 +51,19 @@ export async function GET(req: Request) {
     }
 
     const redis = getRedisOrThrow();
-    const profile = await redis.get(`user:profile:${digits}`);
+    const profileRaw = await redis.get<Record<string, unknown> | null>(`user:profile:${digits}`);
+    const profileBase =
+      profileRaw && typeof profileRaw === "object" && !Array.isArray(profileRaw)
+        ? profileRaw
+        : {};
 
-    return NextResponse.json({ ok: true, profile: profile || null });
+    const profile = {
+      ...profileBase,
+      // Всегда отдаём телефон из текущей сессии как fallback для checkout.
+      phone: String(profileBase.phone ?? normalized),
+    };
+
+    return NextResponse.json({ ok: true, profile });
   } catch (e: any) {
     console.error("PROFILE GET ERROR:", e?.message || e, e);
     return NextResponse.json({ ok: false, error: "PROFILE_GET_FAILED" }, { status: 500 });

@@ -1,8 +1,11 @@
 /** @type {import('next').NextConfig} */
 const isProd = process.env.NODE_ENV === "production";
 const scriptSrc = isProd
-  ? "script-src 'self' 'unsafe-inline' https:"
+  ? "script-src 'self' https:"
   : "script-src 'self' 'unsafe-inline' 'unsafe-eval' https:";
+const styleSrc = isProd
+  ? "style-src 'self' https:"
+  : "style-src 'self' 'unsafe-inline' https:";
 
 const csp = [
   "default-src 'self'",
@@ -11,7 +14,7 @@ const csp = [
   "frame-ancestors 'none'",
   "object-src 'none'",
   scriptSrc,
-  "style-src 'self' 'unsafe-inline' https:",
+  styleSrc,
   "img-src 'self' data: blob: https:",
   "font-src 'self' data: https:",
   "connect-src 'self' https: wss:",

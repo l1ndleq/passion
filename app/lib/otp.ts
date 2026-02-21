@@ -1,5 +1,5 @@
-import crypto from "crypto";
 import { redis } from "@/app/lib/redis";
+import { hashOtp as hashOtpWithPhone } from "@/src/lib/otp";
 
 const OTP_TTL_SECONDS = 5 * 60; // 5 минут
 const OTP_RESEND_COOLDOWN_SECONDS = 60; // 60 сек между запросами
@@ -23,8 +23,8 @@ function otpCooldownKey(phone: string) {
   return `otp:cooldown:${phone}`;
 }
 
-function hashOtp(code: string) {
-  return crypto.createHash("sha256").update(code).digest("hex");
+function hashOtp(phone: string, code: string) {
+  return hashOtpWithPhone(phone, code);
 }
 
 export async function requestOtp(rawPhone: string) {
@@ -41,7 +41,7 @@ export async function requestOtp(rawPhone: string) {
   await redis.set(
     otpKey(phone),
     {
-      hash: hashOtp(code),
+      hash: hashOtp(phone, code),
       attemptsLeft: OTP_MAX_ATTEMPTS,
       createdAt: Date.now(),
     },
@@ -66,7 +66,7 @@ export async function verifyOtp(rawPhone: string, rawCode: string) {
     throw new Error("OTP_ATTEMPTS_EXCEEDED");
   }
 
-  const ok = hashOtp(code) === String(data.hash);
+  const ok = hashOtp(phone, code) === String(data.hash);
   if (!ok) {
     await redis.set(
       otpKey(phone),

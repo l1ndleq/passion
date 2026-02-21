@@ -75,10 +75,15 @@ export default function CheckoutPage() {
     (async () => {
       try {
         setLoadingMe(true);
-        const res = await fetch("/api/me", { cache: "no-store" });
+        const res = await fetch("/api/profile", { cache: "no-store" });
         if (!res.ok) return;
 
-        const me = (await res.json()) as Partial<CheckoutForm>;
+        const payload = (await res.json().catch(() => ({}))) as {
+          ok?: boolean;
+          profile?: Partial<CheckoutForm>;
+        };
+        if (!payload?.ok) return;
+        const me = payload.profile || {};
         if (cancelled) return;
 
         setForm((prev) => ({
