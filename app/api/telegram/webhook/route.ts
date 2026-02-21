@@ -19,18 +19,6 @@ const TG_CHAT_STATE_TTL_SECONDS = 5 * 60;
 const TG_CART_PREFIX = "tg:cart:";
 const TG_CART_TTL_SECONDS = 60 * 60 * 24 * 30;
 
-const ADMIN_ORDER_STATUS_OPTIONS = [
-  "pending_payment",
-  "paid",
-  "processing",
-  "shipped",
-  "delivered",
-  "completed",
-  "cancelled",
-] as const;
-
-type AdminOrderStatus = (typeof ADMIN_ORDER_STATUS_OPTIONS)[number];
-
 type TelegramAuthState = {
   status?: "pending" | "ready";
   next?: string;
@@ -39,7 +27,7 @@ type TelegramAuthState = {
 };
 
 type ChatState = {
-  type: "awaiting_order_id";
+  type: "awaiting_order_id" | "awaiting_promo_code";
 };
 
 type TelegramUser = {
@@ -79,6 +67,7 @@ type StoredOrder = {
 
 type BotCart = {
   items: Array<{ id: string; qty: number }>;
+  promoCode?: string | null;
 };
 
 function normalizePhone(raw: string) {
@@ -91,6 +80,12 @@ function normalizePhone(raw: string) {
 
 function phoneDigits(phone: string) {
   return String(phone || "").replace(/[^\d]/g, "");
+}
+
+function normalizePromoCode(raw: string) {
+  const code = String(raw || "").trim().toUpperCase();
+  if (!/^[A-Z0-9_-]{3,32}$/.test(code)) return "";
+  return code;
 }
 
 function extractStartPayload(text: string) {
@@ -162,23 +157,6 @@ function getSiteUrl(req: Request) {
   }
 }
 
-function getAdminChatIdSet() {
-  const raw = String(process.env.TELEGRAM_CHAT_IDS || "");
-  const ids = raw
-    .split(",")
-    .map((x) => x.trim())
-    .filter(Boolean);
-  return new Set(ids);
-}
-
-function asChatIdString(chatId: number | string) {
-  return String(chatId || "").trim();
-}
-
-function isKnownAdminChat(chatId: number | string) {
-  return getAdminChatIdSet().has(asChatIdString(chatId));
-}
-
 function getProductById(id: string) {
   const needle = String(id || "").trim();
   return PRODUCTS.find((p) => p.id === needle) || null;
@@ -190,8 +168,8 @@ function menuReplyMarkup() {
       [{ text: "🛍 Каталог" }, { text: "🛒 Корзина" }],
       [{ text: "💳 Оформить заказ" }, { text: "📦 Мои заказы" }],
       [{ text: "🔎 Найти заказ" }, { text: "👤 Профиль" }],
-      [{ text: "📱 Привязать номер" }, { text: "❓ Помощь" }],
-      [{ text: "🛠 Админка" }],
+      [{ text: "🎟 Промокод" }, { text: "📱 Привязать номер" }],
+      [{ text: "❓ Помощь" }],
     ],
     resize_keyboard: true,
     is_persistent: true,
@@ -261,7 +239,8 @@ async function readCart(chatId: number | string): Promise<BotCart> {
         .filter((x) => x.id && Number.isFinite(x.qty) && x.qty > 0)
         .map((x) => ({ id: x.id, qty: Math.min(99, Math.floor(x.qty)) }))
     : [];
-  return { items };
+  const promoCode = normalizePromoCode(String(raw?.promoCode || ""));
+  return { items, promoCode: promoCode || null };
 }
 
 async function writeCart(chatId: number | string, cart: BotCart) {
@@ -284,6 +263,14 @@ async function addToCart(chatId: number | string, productId: string, delta = 1) 
     cart.items[idx].qty = Math.min(99, Math.max(1, cart.items[idx].qty + delta));
   }
 
+  await writeCart(chatId, cart);
+  return cart;
+}
+
+async function setCartPromoCode(chatId: number | string, promoCode: string | null) {
+  const cart = await readCart(chatId);
+  const nextCode = normalizePromoCode(String(promoCode || ""));
+  cart.promoCode = nextCode || null;
   await writeCart(chatId, cart);
   return cart;
 }
@@ -398,14 +385,21 @@ async function sendCart(chatId: number | string) {
   }
   lines.push("");
   lines.push(`Итого: ${formatMoney(hydrated.total)} ₽`);
+  lines.push(`Промокод: ${cart.promoCode ? cart.promoCode : "не задан"}`);
+
+  const inlineKeyboard: Array<Array<{ text: string; callback_data: string }>> = [
+    [{ text: "➕ Добавить товары", callback_data: "CATALOG" }],
+    [{ text: "🎟 Ввести промокод", callback_data: "PROMO_SET" }],
+    [{ text: "💳 Оформить заказ", callback_data: "CHECKOUT" }],
+    [{ text: "🧹 Очистить корзину", callback_data: "CART_CLEAR" }],
+  ];
+  if (cart.promoCode) {
+    inlineKeyboard.splice(2, 0, [{ text: "✖️ Убрать промокод", callback_data: "PROMO_CLEAR" }]);
+  }
 
   await tgSend(chatId, lines.join("\n"), {
     reply_markup: {
-      inline_keyboard: [
-        [{ text: "➕ Добавить товары", callback_data: "CATALOG" }],
-        [{ text: "💳 Оформить заказ", callback_data: "CHECKOUT" }],
-        [{ text: "🧹 Очистить корзину", callback_data: "CART_CLEAR" }],
-      ],
+      inline_keyboard: inlineKeyboard,
     },
   });
 }
@@ -521,208 +515,6 @@ async function sendMyOrders(chatId: number | string) {
   });
 }
 
-function isAdminStatus(value: string): value is AdminOrderStatus {
-  return (ADMIN_ORDER_STATUS_OPTIONS as readonly string[]).includes(value);
-}
-
-async function sendAdminMenu(chatId: number | string) {
-  if (!isKnownAdminChat(chatId)) {
-    await tgSend(chatId, "Доступ к админке запрещен.");
-    return;
-  }
-
-  await tgSend(chatId, "🛠 Админка Telegram", {
-    reply_markup: {
-      inline_keyboard: [
-        [{ text: "📋 Последние заказы", callback_data: "ADM_ORDERS" }],
-        [{ text: "🔄 Обновить админку", callback_data: "ADM_MENU" }],
-      ],
-    },
-  });
-}
-
-async function getRecentOrders(limit: number) {
-  const idsRaw = (await redis.lrange("orders:latest", 0, Math.max(0, limit - 1))) as unknown[];
-  const ids = (Array.isArray(idsRaw) ? idsRaw : [])
-    .map((x) => normalizeOrderId(String(x || "")))
-    .filter(Boolean);
-  if (!ids.length) return [] as StoredOrder[];
-
-  const rows = await redis.mget(...ids.map((id) => `order:${id}`));
-  return (Array.isArray(rows) ? rows : []).filter(Boolean) as StoredOrder[];
-}
-
-async function sendAdminOrders(chatId: number | string) {
-  if (!isKnownAdminChat(chatId)) {
-    await tgSend(chatId, "Доступ к админке запрещен.");
-    return;
-  }
-
-  const orders = await getRecentOrders(15);
-  if (!orders.length) {
-    await tgSend(chatId, "Заказов пока нет.");
-    return;
-  }
-
-  const lines = ["📋 Последние заказы", ""];
-  for (const o of orders.slice(0, 15)) {
-    const orderId = normalizeOrderId(String(o.orderId || ""));
-    if (!orderId) continue;
-    const total = formatMoney(Number(o.totalPrice || 0));
-    const phone = String(o.customer?.phone || "").trim();
-    lines.push(`• ${orderId} — ${statusLabel(o.status)} — ${total} ₽${phone ? ` — ${phone}` : ""}`);
-  }
-
-  const keyboard = orders
-    .slice(0, 10)
-    .map((o) => [{ text: normalizeOrderId(String(o.orderId || "")), callback_data: `ADM_OPEN:${normalizeOrderId(String(o.orderId || ""))}` }])
-    .filter((row) => row[0].text);
-  keyboard.push([{ text: "🔄 Обновить", callback_data: "ADM_ORDERS" }]);
-
-  await tgSend(chatId, lines.join("\n"), {
-    reply_markup: { inline_keyboard: keyboard },
-  });
-}
-
-function adminStatusButtons(orderId: string) {
-  return [
-    [
-      { text: "pending_payment", callback_data: `ADM_SET:${orderId}:pending_payment` },
-      { text: "paid", callback_data: `ADM_SET:${orderId}:paid` },
-    ],
-    [
-      { text: "processing", callback_data: `ADM_SET:${orderId}:processing` },
-      { text: "shipped", callback_data: `ADM_SET:${orderId}:shipped` },
-    ],
-    [
-      { text: "delivered", callback_data: `ADM_SET:${orderId}:delivered` },
-      { text: "completed", callback_data: `ADM_SET:${orderId}:completed` },
-    ],
-    [{ text: "cancelled", callback_data: `ADM_SET:${orderId}:cancelled` }],
-    [{ text: "⬅️ К заказам", callback_data: "ADM_ORDERS" }],
-  ];
-}
-
-async function sendAdminOrderDetails(chatId: number | string, orderIdRaw: string, siteUrl: string) {
-  if (!isKnownAdminChat(chatId)) {
-    await tgSend(chatId, "Доступ к админке запрещен.");
-    return;
-  }
-
-  const orderId = normalizeOrderId(orderIdRaw);
-  if (!orderId || !isOrderIdValid(orderId)) {
-    await tgSend(chatId, "Некорректный номер заказа.");
-    return;
-  }
-
-  const order = await redis.get<StoredOrder & Record<string, unknown>>(`order:${orderId}`);
-  if (!order) {
-    await tgSend(chatId, `Заказ ${orderId} не найден.`);
-    return;
-  }
-
-  const name = String(order.customer?.name || "").trim();
-  const phone = String(order.customer?.phone || "").trim();
-  const lines = [
-    `🧾 Заказ ${orderId}`,
-    `Статус: ${statusLabel(order.status)}`,
-    `Сумма: ${formatMoney(Number(order.totalPrice || 0))} ₽`,
-    `Создан: ${formatDate(order.createdAt)}`,
-    `Клиент: ${name || "—"}`,
-    `Телефон: ${phone || "—"}`,
-  ];
-
-  const items = Array.isArray(order.items) ? order.items : [];
-  if (items.length) {
-    lines.push("");
-    lines.push("Состав:");
-    for (const it of items.slice(0, 8)) {
-      const title = String(it?.title || it?.id || "Товар");
-      const qty = Math.max(1, Number(it?.qty || 1));
-      lines.push(`• ${title} × ${qty}`);
-    }
-    if (items.length > 8) lines.push("• …");
-  }
-
-  const adminUrl = siteUrl ? `${siteUrl}/admin/orders/${encodeURIComponent(orderId)}` : "";
-  const keyboard: Array<Array<{ text: string; callback_data?: string; url?: string }>> =
-    adminStatusButtons(orderId);
-  if (adminUrl) keyboard.unshift([{ text: "Открыть в админке сайта", url: adminUrl }]);
-
-  await tgSend(chatId, lines.join("\n"), {
-    reply_markup: { inline_keyboard: keyboard },
-  });
-}
-
-async function updateOrderStatusFromTelegram(
-  chatId: number | string,
-  orderIdRaw: string,
-  statusRaw: string,
-  siteUrl: string
-) {
-  if (!isKnownAdminChat(chatId)) {
-    await tgSend(chatId, "Доступ к админке запрещен.");
-    return;
-  }
-
-  const orderId = normalizeOrderId(orderIdRaw);
-  const status = String(statusRaw || "").trim();
-  if (!orderId || !isOrderIdValid(orderId) || !isAdminStatus(status)) {
-    await tgSend(chatId, "Не удалось обновить статус: неверные данные.");
-    return;
-  }
-
-  const key = `order:${orderId}`;
-  const order = await redis.get<Record<string, unknown>>(key);
-  if (!order) {
-    await tgSend(chatId, `Заказ ${orderId} не найден.`);
-    return;
-  }
-
-  const prev = String(order.status || "");
-  if (prev === status) {
-    await tgSend(chatId, `Статус заказа ${orderId} уже: ${statusLabel(status)}.`);
-    await sendAdminOrderDetails(chatId, orderId, siteUrl);
-    return;
-  }
-
-  const history = Array.isArray(order.statusHistory)
-    ? (order.statusHistory as Array<Record<string, unknown>>)
-    : [];
-  const now = Date.now();
-  const updated = {
-    ...order,
-    status,
-    updatedAt: now,
-    statusHistory: [
-      ...history,
-      {
-        status,
-        at: now,
-        by: "admin",
-      },
-    ],
-  };
-
-  await redis.set(key, updated);
-
-  const adminSecret = String(process.env.ADMIN_SECRET || "").trim();
-  if (siteUrl && adminSecret) {
-    await fetch(`${siteUrl}/api/account/orders/status`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-admin-secret": adminSecret,
-        Origin: siteUrl,
-      },
-      body: JSON.stringify({ orderId, status }),
-    }).catch(() => {});
-  }
-
-  await tgSend(chatId, `✅ ${orderId}: статус изменен на ${statusLabel(status)}.`);
-  await sendAdminOrderDetails(chatId, orderId, siteUrl);
-}
-
 function localizeCreateOrderError(code: string) {
   switch (code) {
     case "ITEMS_REQUIRED":
@@ -735,6 +527,14 @@ function localizeCreateOrderError(code: string) {
       return "Не удалось определить имя. Заполните профиль на сайте или напишите имя в чат.";
     case "TOO_MANY_REQUESTS":
       return "Слишком много попыток. Повторите чуть позже.";
+    case "PROMO_INVALID":
+      return "Промокод не найден.";
+    case "PROMO_INACTIVE":
+      return "Промокод отключен.";
+    case "PROMO_EXPIRED":
+      return "Срок действия промокода истек.";
+    case "PROMO_USAGE_LIMIT":
+      return "Лимит использований промокода исчерпан.";
     default:
       return `Не удалось оформить заказ (${code || "UNKNOWN"}).`;
   }
@@ -791,6 +591,7 @@ async function checkoutFromBot(chatId: number | string, siteUrl: string, user?: 
       qty: x.qty,
     })),
     totalPrice: hydrated.total,
+    promoCode: cart.promoCode || null,
   };
 
   const res = await fetch(`${siteUrl}/api/pay/create`, {
@@ -828,11 +629,12 @@ async function sendHelp(chatId: number | string) {
       "• Кнопки снизу — основной способ.",
       "• Каталог — добавить товары в корзину.",
       "• Корзина — проверить и оформить заказ.",
+      "• Промокод — добавить/заменить код скидки для корзины.",
       "• Мои заказы — список последних заказов.",
       "• Найти заказ — ввод номера заказа.",
       "",
       "Резервные команды:",
-      "/menu /catalog /cart /checkout /orders /order P-XXXX /profile /help",
+      "/menu /catalog /cart /promo CODE /checkout /orders /order P-XXXX /profile /help",
     ].join("\n"),
     { reply_markup: menuReplyMarkup() }
   );
@@ -880,40 +682,6 @@ export async function POST(req: Request) {
     if (callback?.message?.chat?.id) {
       const chatId = callback.message.chat.id;
       const data = String(callback.data || "").trim();
-      const isAdmin = isKnownAdminChat(chatId);
-
-      if (data.startsWith("ADM_") && !isAdmin) {
-        await tgAnswerCallback(callback.id, "Нет доступа");
-        return NextResponse.json({ ok: true });
-      }
-
-      if (data === "ADM_MENU") {
-        await sendAdminMenu(chatId);
-        await tgAnswerCallback(callback.id);
-        return NextResponse.json({ ok: true });
-      }
-
-      if (data === "ADM_ORDERS") {
-        await sendAdminOrders(chatId);
-        await tgAnswerCallback(callback.id);
-        return NextResponse.json({ ok: true });
-      }
-
-      if (data.startsWith("ADM_OPEN:")) {
-        const orderId = String(data.slice("ADM_OPEN:".length) || "");
-        await sendAdminOrderDetails(chatId, orderId, siteUrl);
-        await tgAnswerCallback(callback.id);
-        return NextResponse.json({ ok: true });
-      }
-
-      if (data.startsWith("ADM_SET:")) {
-        const parts = data.split(":");
-        const orderId = String(parts[1] || "");
-        const status = String(parts[2] || "");
-        await updateOrderStatusFromTelegram(chatId, orderId, status, siteUrl);
-        await tgAnswerCallback(callback.id);
-        return NextResponse.json({ ok: true });
-      }
 
       if (data === "ASK_CONTACT") {
         await requestContact(chatId, "Чтобы пользоваться всеми функциями, привяжите номер телефона.");
@@ -948,6 +716,23 @@ export async function POST(req: Request) {
       if (data === "CART_CLEAR") {
         await clearCart(chatId);
         await tgSend(chatId, "🧹 Корзина очищена.", { reply_markup: menuReplyMarkup() });
+        await tgAnswerCallback(callback.id);
+        return NextResponse.json({ ok: true });
+      }
+
+      if (data === "PROMO_SET") {
+        await setChatState(chatId, { type: "awaiting_promo_code" });
+        await tgSend(chatId, "Отправьте промокод одним сообщением. Например: WELCOME10", {
+          reply_markup: menuReplyMarkup(),
+        });
+        await tgAnswerCallback(callback.id);
+        return NextResponse.json({ ok: true });
+      }
+
+      if (data === "PROMO_CLEAR") {
+        await setCartPromoCode(chatId, null);
+        await tgSend(chatId, "Промокод удален из корзины.");
+        await sendCart(chatId);
         await tgAnswerCallback(callback.id);
         return NextResponse.json({ ok: true });
       }
@@ -1086,38 +871,37 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true });
     }
 
-    if (/^\/admin(?:@\w+)?$/i.test(text) || textLooksLike(text, "админ")) {
-      if (!isKnownAdminChat(chatId)) {
-        await tgSend(
-          chatId,
-          `Доступ к админке запрещен.\nВаш chat_id: ${asChatIdString(chatId)}\nДобавьте его в TELEGRAM_CHAT_IDS и сделайте redeploy.`,
-          {
-            reply_markup: menuReplyMarkup(),
-          }
-        );
-        return NextResponse.json({ ok: true });
-      }
-      await sendAdminMenu(chatId);
-      return NextResponse.json({ ok: true });
-    }
-
-    if (/^\/myid(?:@\w+)?$/i.test(text)) {
-      await tgSend(
-        chatId,
-        `chat_id: ${asChatIdString(chatId)}\nadmin_access: ${isKnownAdminChat(chatId) ? "yes" : "no"}`,
-        {
-          reply_markup: menuReplyMarkup(),
-        }
-      );
-      return NextResponse.json({ ok: true });
-    }
-
     if (/^\/catalog(?:@\w+)?$/i.test(text) || textLooksLike(text, "каталог")) {
       await sendCatalog(chatId);
       return NextResponse.json({ ok: true });
     }
 
     if (/^\/cart(?:@\w+)?$/i.test(text) || textLooksLike(text, "корзин")) {
+      await sendCart(chatId);
+      return NextResponse.json({ ok: true });
+    }
+
+    const promoMatch = text.match(/^\/promo(?:@\w+)?(?:\s+(.+))?$/i);
+    if (promoMatch) {
+      const rawPromo = String(promoMatch[1] || "").trim();
+      if (!rawPromo) {
+        await setChatState(chatId, { type: "awaiting_promo_code" });
+        await tgSend(chatId, "Отправьте промокод одним сообщением. Например: WELCOME10");
+        return NextResponse.json({ ok: true });
+      }
+      if (/^(none|off|clear|нет|удалить)$/i.test(rawPromo)) {
+        await setCartPromoCode(chatId, null);
+        await tgSend(chatId, "Промокод удален.");
+        await sendCart(chatId);
+        return NextResponse.json({ ok: true });
+      }
+      const code = normalizePromoCode(rawPromo);
+      if (!code) {
+        await tgSend(chatId, "Некорректный формат промокода. Разрешены A-Z, 0-9, _ и -.");
+        return NextResponse.json({ ok: true });
+      }
+      await setCartPromoCode(chatId, code);
+      await tgSend(chatId, `Промокод ${code} сохранен. Применим его при оформлении.`);
       await sendCart(chatId);
       return NextResponse.json({ ok: true });
     }
@@ -1142,6 +926,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true });
     }
 
+    if (textLooksLike(text, "промокод") || textLooksLike(text, "промо")) {
+      await setChatState(chatId, { type: "awaiting_promo_code" });
+      await tgSend(chatId, "Отправьте промокод одним сообщением. Например: WELCOME10");
+      return NextResponse.json({ ok: true });
+    }
+
     if (textLooksLike(text, "найти заказ")) {
       await setChatState(chatId, { type: "awaiting_order_id" });
       await tgSend(chatId, "Отправьте номер заказа (пример: P-MLGLJ641).", {
@@ -1157,6 +947,19 @@ export async function POST(req: Request) {
     }
 
     const chatState = await getChatState(chatId);
+    if (chatState?.type === "awaiting_promo_code") {
+      await setChatState(chatId, null);
+      const code = normalizePromoCode(text);
+      if (!code) {
+        await tgSend(chatId, "Некорректный формат промокода. Разрешены A-Z, 0-9, _ и -.");
+        return NextResponse.json({ ok: true });
+      }
+      await setCartPromoCode(chatId, code);
+      await tgSend(chatId, `Промокод ${code} сохранен. Применим его при оформлении.`);
+      await sendCart(chatId);
+      return NextResponse.json({ ok: true });
+    }
+
     if (chatState?.type === "awaiting_order_id") {
       await setChatState(chatId, null);
       await sendOrderDetails(chatId, text, siteUrl);

@@ -1,5 +1,12 @@
 import { NextResponse } from "next/server";
 import { redis } from "@/app/lib/redis";
+import {
+  normalizePromoCode,
+  promoCodeKey,
+  PROMO_CODES_INDEX_KEY,
+  sanitizePromoRecord,
+  type PromoType,
+} from "@/app/lib/promocodes";
 
 const ADMIN_BOT_TOKEN =
   String(process.env.TELEGRAM_ADMIN_BOT_TOKEN || "").trim() ||
@@ -49,6 +56,8 @@ type StoredOrder = {
     by?: string;
   }>;
 };
+
+type PromoRecord = NonNullable<ReturnType<typeof sanitizePromoRecord>>;
 
 function asChatIdString(chatId: number | string) {
   return String(chatId || "").trim();
@@ -120,6 +129,13 @@ function statusLabel(status: string | undefined) {
   }
 }
 
+function parsePromoType(raw: string): PromoType | null {
+  const value = String(raw || "").trim().toLowerCase();
+  if (value === "percent" || value === "%") return "percent";
+  if (value === "fixed" || value === "rub" || value === "rur" || value === "₽") return "fixed";
+  return null;
+}
+
 function getSiteUrl(req: Request) {
   const envSite = String(process.env.NEXT_PUBLIC_SITE_URL || "").trim();
   if (envSite) return envSite.replace(/\/+$/, "");
@@ -160,6 +176,7 @@ async function sendAdminMenu(chatId: number | string) {
     reply_markup: {
       inline_keyboard: [
         [{ text: "📋 Последние заказы", callback_data: "ADM_ORDERS" }],
+        [{ text: "🎟 Промокоды", callback_data: "ADM_PROMOS" }],
         [{ text: "🔄 Обновить", callback_data: "ADM_MENU" }],
       ],
     },
@@ -335,6 +352,196 @@ async function updateOrderStatusFromTelegram(
   await sendAdminOrderDetails(chatId, orderId, siteUrl);
 }
 
+function promoTypeLabel(type: PromoType) {
+  return type === "percent" ? "%" : "₽";
+}
+
+function promoValueLabel(promo: PromoRecord) {
+  return promo.type === "percent"
+    ? `${Math.floor(Number(promo.value || 0))}%`
+    : `${formatMoney(Math.floor(Number(promo.value || 0)))} ₽`;
+}
+
+function promoStateLabel(promo: PromoRecord) {
+  if (!promo.active) return "выключен";
+  if (promo.expiresAt && Date.now() > promo.expiresAt) return "истек";
+  if (promo.maxUses && promo.usedCount >= promo.maxUses) return "лимит исчерпан";
+  return "активен";
+}
+
+async function getPromos(limit = 20) {
+  const codesRaw = await redis.smembers<string[]>(PROMO_CODES_INDEX_KEY);
+  const codes = (Array.isArray(codesRaw) ? codesRaw : [])
+    .map((x) => normalizePromoCode(x))
+    .filter(Boolean);
+  if (!codes.length) return [] as PromoRecord[];
+
+  const rows = await redis.mget(...codes.map((code) => promoCodeKey(code)));
+  const promos = (Array.isArray(rows) ? rows : [])
+    .map((row) => sanitizePromoRecord(row))
+    .filter(Boolean) as PromoRecord[];
+
+  return promos.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)).slice(0, limit);
+}
+
+async function sendAdminPromos(chatId: number | string) {
+  const promos = await getPromos(20);
+  if (!promos.length) {
+    await tgSend(
+      chatId,
+      [
+        "🎟 Промокоды",
+        "Список пуст.",
+        "",
+        "Создать: /promo CODE percent|fixed VALUE",
+        "Пример: /promo WELCOME10 percent 10",
+      ].join("\n")
+    );
+    return;
+  }
+
+  const lines = ["🎟 Промокоды", ""];
+  for (const promo of promos) {
+    lines.push(
+      `• ${promo.code} — ${promoValueLabel(promo)} — ${promoStateLabel(promo)} (${promo.usedCount}/${promo.maxUses || "∞"})`
+    );
+  }
+
+  const keyboard = promos
+    .slice(0, 10)
+    .map((promo) => [{ text: promo.code, callback_data: `ADM_PROMO_OPEN:${promo.code}` }]);
+  keyboard.push([{ text: "🔄 Обновить", callback_data: "ADM_PROMOS" }]);
+  keyboard.push([{ text: "⬅️ Админка", callback_data: "ADM_MENU" }]);
+
+  await tgSend(chatId, lines.join("\n"), { reply_markup: { inline_keyboard: keyboard } });
+}
+
+async function sendAdminPromoDetails(chatId: number | string, codeRaw: string) {
+  const code = normalizePromoCode(codeRaw);
+  if (!code) {
+    await tgSend(chatId, "Некорректный код промокода.");
+    return;
+  }
+
+  const promo = sanitizePromoRecord(await redis.get(promoCodeKey(code)));
+  if (!promo) {
+    await tgSend(chatId, `Промокод ${code} не найден.`);
+    return;
+  }
+
+  const lines = [
+    `🎟 ${promo.code}`,
+    `Скидка: ${promoValueLabel(promo)}`,
+    `Тип: ${promoTypeLabel(promo.type)}`,
+    `Статус: ${promoStateLabel(promo)}`,
+    `Использовано: ${promo.usedCount}${promo.maxUses ? ` / ${promo.maxUses}` : " / ∞"}`,
+    `Истекает: ${promo.expiresAt ? formatDate(promo.expiresAt) : "бессрочно"}`,
+    `Обновлен: ${formatDate(promo.updatedAt)}`,
+  ];
+
+  await tgSend(chatId, lines.join("\n"), {
+    reply_markup: {
+      inline_keyboard: [
+        [
+          {
+            text: promo.active ? "⏸ Выключить" : "▶️ Включить",
+            callback_data: `ADM_PROMO_TOGGLE:${promo.code}:${promo.active ? "0" : "1"}`,
+          },
+        ],
+        [{ text: "🗑 Удалить", callback_data: `ADM_PROMO_DEL:${promo.code}` }],
+        [{ text: "⬅️ К промокодам", callback_data: "ADM_PROMOS" }],
+      ],
+    },
+  });
+}
+
+async function upsertPromoFromText(
+  chatId: number | string,
+  codeRaw: string,
+  typeRaw: string,
+  valueRaw: string
+) {
+  const code = normalizePromoCode(codeRaw);
+  const type = parsePromoType(typeRaw);
+  const value = Math.floor(Number(valueRaw));
+  if (!code || !type || !Number.isFinite(value) || value <= 0 || (type === "percent" && value > 95)) {
+    await tgSend(
+      chatId,
+      "Формат: /promo CODE percent|fixed VALUE\nПример: /promo WELCOME10 percent 10"
+    );
+    return;
+  }
+
+  const key = promoCodeKey(code);
+  const existing = sanitizePromoRecord(await redis.get(key));
+  const now = Date.now();
+
+  const promo = sanitizePromoRecord({
+    code,
+    type,
+    value,
+    active: existing?.active ?? true,
+    maxUses: existing?.maxUses ?? null,
+    expiresAt: existing?.expiresAt ?? null,
+    usedCount: existing?.usedCount ?? 0,
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now,
+  });
+
+  if (!promo) {
+    await tgSend(chatId, "Не удалось сохранить промокод: проверьте параметры.");
+    return;
+  }
+
+  await redis.set(key, promo);
+  await redis.sadd(PROMO_CODES_INDEX_KEY, promo.code);
+  await tgSend(chatId, `✅ Промокод ${promo.code} сохранен.`);
+  await sendAdminPromoDetails(chatId, promo.code);
+}
+
+async function setPromoActiveFromText(chatId: number | string, codeRaw: string, active: boolean) {
+  const code = normalizePromoCode(codeRaw);
+  if (!code) {
+    await tgSend(chatId, "Укажите корректный код промокода.");
+    return;
+  }
+
+  const key = promoCodeKey(code);
+  const current = sanitizePromoRecord(await redis.get(key));
+  if (!current) {
+    await tgSend(chatId, `Промокод ${code} не найден.`);
+    return;
+  }
+
+  const next = sanitizePromoRecord({
+    ...current,
+    active,
+    updatedAt: Date.now(),
+  });
+  if (!next) {
+    await tgSend(chatId, "Не удалось обновить промокод.");
+    return;
+  }
+
+  await redis.set(key, next);
+  await redis.sadd(PROMO_CODES_INDEX_KEY, code);
+  await tgSend(chatId, `✅ ${code}: ${active ? "включен" : "выключен"}.`);
+  await sendAdminPromoDetails(chatId, code);
+}
+
+async function deletePromoFromText(chatId: number | string, codeRaw: string) {
+  const code = normalizePromoCode(codeRaw);
+  if (!code) {
+    await tgSend(chatId, "Укажите корректный код промокода.");
+    return;
+  }
+
+  await redis.del(promoCodeKey(code));
+  await redis.srem(PROMO_CODES_INDEX_KEY, code);
+  await tgSend(chatId, `🗑 Промокод ${code} удален.`);
+  await sendAdminPromos(chatId);
+}
+
 function denyText(chatId: number | string) {
   return `Доступ к админке запрещен.\nВаш chat_id: ${asChatIdString(chatId)}\nДобавьте его в TELEGRAM_CHAT_IDS.`;
 }
@@ -381,6 +588,12 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: true });
       }
 
+      if (data === "ADM_PROMOS") {
+        await sendAdminPromos(chatId);
+        await tgAnswerCallback(callback.id);
+        return NextResponse.json({ ok: true });
+      }
+
       if (data.startsWith("ADM_OPEN:")) {
         const orderId = String(data.slice("ADM_OPEN:".length) || "");
         await sendAdminOrderDetails(chatId, orderId, siteUrl);
@@ -393,6 +606,29 @@ export async function POST(req: Request) {
         const orderId = String(parts[1] || "");
         const status = String(parts[2] || "");
         await updateOrderStatusFromTelegram(chatId, orderId, status, siteUrl);
+        await tgAnswerCallback(callback.id);
+        return NextResponse.json({ ok: true });
+      }
+
+      if (data.startsWith("ADM_PROMO_OPEN:")) {
+        const code = String(data.slice("ADM_PROMO_OPEN:".length) || "");
+        await sendAdminPromoDetails(chatId, code);
+        await tgAnswerCallback(callback.id);
+        return NextResponse.json({ ok: true });
+      }
+
+      if (data.startsWith("ADM_PROMO_TOGGLE:")) {
+        const parts = data.split(":");
+        const code = String(parts[1] || "");
+        const nextRaw = String(parts[2] || "");
+        await setPromoActiveFromText(chatId, code, nextRaw === "1");
+        await tgAnswerCallback(callback.id);
+        return NextResponse.json({ ok: true });
+      }
+
+      if (data.startsWith("ADM_PROMO_DEL:")) {
+        const code = String(data.slice("ADM_PROMO_DEL:".length) || "");
+        await deletePromoFromText(chatId, code);
         await tgAnswerCallback(callback.id);
         return NextResponse.json({ ok: true });
       }
@@ -433,12 +669,74 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true });
     }
 
+    const promoCreateMatch = text.match(/^\/promo(?:@\w+)?\s+([A-Z0-9_-]{3,32})\s+([a-zA-Z%₽]+)\s+(\d{1,6})$/i);
+    if (promoCreateMatch) {
+      if (!isKnownAdminChat(chatId)) {
+        await tgSend(chatId, denyText(chatId));
+        return NextResponse.json({ ok: true });
+      }
+      await upsertPromoFromText(chatId, promoCreateMatch[1], promoCreateMatch[2], promoCreateMatch[3]);
+      return NextResponse.json({ ok: true });
+    }
+
+    const promosListMatch = text.match(/^\/promos(?:@\w+)?$/i);
+    if (promosListMatch) {
+      if (!isKnownAdminChat(chatId)) {
+        await tgSend(chatId, denyText(chatId));
+        return NextResponse.json({ ok: true });
+      }
+      await sendAdminPromos(chatId);
+      return NextResponse.json({ ok: true });
+    }
+
+    const promoOnMatch = text.match(/^\/promo_on(?:@\w+)?\s+([A-Z0-9_-]{3,32})$/i);
+    if (promoOnMatch) {
+      if (!isKnownAdminChat(chatId)) {
+        await tgSend(chatId, denyText(chatId));
+        return NextResponse.json({ ok: true });
+      }
+      await setPromoActiveFromText(chatId, promoOnMatch[1], true);
+      return NextResponse.json({ ok: true });
+    }
+
+    const promoOffMatch = text.match(/^\/promo_off(?:@\w+)?\s+([A-Z0-9_-]{3,32})$/i);
+    if (promoOffMatch) {
+      if (!isKnownAdminChat(chatId)) {
+        await tgSend(chatId, denyText(chatId));
+        return NextResponse.json({ ok: true });
+      }
+      await setPromoActiveFromText(chatId, promoOffMatch[1], false);
+      return NextResponse.json({ ok: true });
+    }
+
+    const promoDeleteMatch = text.match(/^\/promo_del(?:@\w+)?\s+([A-Z0-9_-]{3,32})$/i);
+    if (promoDeleteMatch) {
+      if (!isKnownAdminChat(chatId)) {
+        await tgSend(chatId, denyText(chatId));
+        return NextResponse.json({ ok: true });
+      }
+      await deletePromoFromText(chatId, promoDeleteMatch[1]);
+      return NextResponse.json({ ok: true });
+    }
+
     if (!isKnownAdminChat(chatId)) {
       await tgSend(chatId, denyText(chatId));
       return NextResponse.json({ ok: true });
     }
 
-    await tgSend(chatId, "Используйте /admin или /myid.");
+    await tgSend(
+      chatId,
+      [
+        "Используйте:",
+        "/admin",
+        "/myid",
+        "/promos",
+        "/promo CODE percent|fixed VALUE",
+        "/promo_on CODE",
+        "/promo_off CODE",
+        "/promo_del CODE",
+      ].join("\n")
+    );
     return NextResponse.json({ ok: true });
   } catch (error: unknown) {
     console.error("TELEGRAM_ADMIN_WEBHOOK_ERROR:", error);
