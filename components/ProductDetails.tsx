@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 
 type Section = {
   title: string;
@@ -27,23 +28,30 @@ export default function ProductDetails({
             >
               <span>{section.title}</span>
               <span
-                className={`transition-transform duration-300 ${
-                  isOpen ? "rotate-45" : ""
-                }`}
+                className={`transition-transform duration-300 ${isOpen ? "rotate-45" : ""
+                  }`}
               >
                 +
               </span>
             </button>
 
-            <div
-              className={`overflow-hidden transition-all duration-300 ${
-                isOpen ? "max-h-96 pb-5" : "max-h-0"
-              }`}
-            >
-              <p className="text-sm leading-relaxed text-black/70">
-                {section.content}
-              </p>
-            </div>
+            <AnimatePresence initial={false}>
+              {isOpen && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.3, ease: [0.04, 0.62, 0.23, 0.98] }}
+                  className="overflow-hidden"
+                >
+                  <div className="pb-5">
+                    <p className="text-sm leading-relaxed text-black/70">
+                      {section.content}
+                    </p>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         );
       })}

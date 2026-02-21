@@ -9,7 +9,7 @@ import MobileMenu from "@/components/MobileMenu";
 import CartLinkClientOnly from "@/components/CartLinkClientOnly";
 import { Inter, Cormorant_Garamond } from "next/font/google";
 import MiniCartDrawer from "@/components/MiniCartDrawer";
-
+import { SupportWidget } from "@/components/SupportWidget";
 
 const inter = Inter({
   subsets: ["latin", "cyrillic"],
@@ -78,7 +78,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                     <Link href="/" aria-label="На главную" className="inline-flex min-h-[44px] items-center">
                       {/* если у тебя лого не /logo.png — поменяй путь */}
                       <Image
-  src="/brand/logo.png"
+                        src="/brand/logo.png"
 
                         alt="Passion"
                         width={110}
@@ -106,6 +106,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               </header>
             </StickyHeader>
             <MiniCartDrawer />
+            <SupportWidget />
 
             {children}
 

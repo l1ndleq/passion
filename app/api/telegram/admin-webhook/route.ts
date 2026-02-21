@@ -345,7 +345,7 @@ async function updateOrderStatusFromTelegram(
         Origin: siteUrl,
       },
       body: JSON.stringify({ orderId, status }),
-    }).catch(() => {});
+    }).catch(() => { });
   }
 
   await tgSend(chatId, `✅ ${orderId}: статус изменен на ${statusLabel(status)}.`);
@@ -642,6 +642,42 @@ export async function POST(req: Request) {
     if (!chatId) return NextResponse.json({ ok: true });
     const text = String(msg?.text || "").trim();
 
+    // ----------------------------------------------------------------------
+    // SUPPORT CHAT: Intercept admin replies
+    // ----------------------------------------------------------------------
+    const replyToMsg = (msg as any)?.reply_to_message;
+
+    // DEBUG: Если это реплай, но мы его не поймали, можно отправить админу структуру, 
+    // чтобы понять в чем дело. Уберем после тестирования.
+    if (replyToMsg) {
+      const replyText = replyToMsg.text || replyToMsg.caption || "";
+      const match = replyText.match(/#session_([a-zA-Z0-9-]+)/);
+      if (match && match[1]) {
+        const sessionId = match[1];
+        try {
+          // Push admin's reply to Redis
+          const SUPPORT_CHAT_PREFIX = "support:chat:";
+          const key = `${SUPPORT_CHAT_PREFIX}${sessionId}`;
+          await redis.rpush(key, {
+            id: crypto.randomUUID(),
+            sender: "admin",
+            text: text,
+            timestamp: Date.now(),
+          });
+
+          await tgSend(chatId, "✅ Ответ отправлен пользователю.");
+        } catch (e) {
+          console.error("Error saving admin reply:", e);
+          await tgSend(chatId, "❌ Ошибка при отправке ответа.");
+        }
+        return NextResponse.json({ ok: true });
+      } else {
+        // DEBUG
+        await tgSend(chatId, "⚠️ Реплай получен, но #session_ ID не найден в тексте:\n" + String(replyText).slice(0, 100));
+      }
+    }
+    // ----------------------------------------------------------------------
+
     if (/^\/myid(?:@\w+)?$/i.test(text)) {
       await tgSend(
         chatId,
@@ -735,6 +771,9 @@ export async function POST(req: Request) {
         "/promo_on CODE",
         "/promo_off CODE",
         "/promo_del CODE",
+        "",
+        "DEBUG INFO PAYLOAD:",
+        JSON.stringify(update).slice(0, 2000),
       ].join("\n")
     );
     return NextResponse.json({ ok: true });

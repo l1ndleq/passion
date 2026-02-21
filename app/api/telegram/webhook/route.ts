@@ -235,9 +235,9 @@ async function readCart(chatId: number | string): Promise<BotCart> {
   const raw = await redis.get<BotCart>(cartKey(chatId));
   const items = Array.isArray(raw?.items)
     ? raw.items
-        .map((x) => ({ id: String(x?.id || ""), qty: Number(x?.qty || 0) }))
-        .filter((x) => x.id && Number.isFinite(x.qty) && x.qty > 0)
-        .map((x) => ({ id: x.id, qty: Math.min(99, Math.floor(x.qty)) }))
+      .map((x) => ({ id: String(x?.id || ""), qty: Number(x?.qty || 0) }))
+      .filter((x) => x.id && Number.isFinite(x.qty) && x.qty > 0)
+      .map((x) => ({ id: x.id, qty: Math.min(99, Math.floor(x.qty)) }))
     : [];
   const promoCode = normalizePromoCode(String(raw?.promoCode || ""));
   return { items, promoCode: promoCode || null };
@@ -290,12 +290,12 @@ function hydrateCart(cart: BotCart) {
       };
     })
     .filter(Boolean) as Array<{
-    id: string;
-    title: string;
-    price: number;
-    qty: number;
-    sum: number;
-  }>;
+      id: string;
+      title: string;
+      price: number;
+      qty: number;
+      sum: number;
+    }>;
 
   const total = items.reduce((acc, it) => acc + it.sum, 0);
   return { items, total };

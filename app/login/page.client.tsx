@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
+import { Reveal } from "@/components/Reveal";
 
 export default function LoginClient() {
   const router = useRouter();
@@ -85,10 +86,12 @@ export default function LoginClient() {
 
   return (
     <div className="max-w-md mx-auto p-6 space-y-4">
-      <div>
-        <div className="text-sm text-black/60">Личный кабинет</div>
-        <div className="text-2xl font-semibold">Вход по телефону</div>
-      </div>
+      <Reveal>
+        <div>
+          <div className="text-sm text-black/60">Личный кабинет</div>
+          <div className="text-2xl font-semibold">Вход по телефону</div>
+        </div>
+      </Reveal>
 
       {error ? (
         <div className="border border-red-200 bg-red-50 p-3 rounded-xl text-sm text-red-700">
@@ -97,73 +100,77 @@ export default function LoginClient() {
       ) : null}
 
       {hint ? (
-        <div className="border border-black/10 bg-white/50 p-3 rounded-xl text-sm text-black/70">
-          {hint}
-        </div>
+        <Reveal delay={0.1}>
+          <div className="border border-black/10 bg-white/50 p-3 rounded-xl text-sm text-black/70">
+            {hint}
+          </div>
+        </Reveal>
       ) : null}
 
-      <div className="border border-black/10 rounded-2xl bg-white/40 p-4 space-y-3">
-        <label className="block">
-          <div className="text-xs text-black/50 mb-1">Телефон</div>
-          <input
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            placeholder="+7 999 123-45-67"
-            className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm bg-white/60 outline-none focus:ring-2 focus:ring-black/10"
-            disabled={loading || stage === "code"}
-          />
-        </label>
-
-        {stage === "code" ? (
+      <Reveal delay={0.2}>
+        <div className="border border-black/10 rounded-2xl bg-white/40 p-4 space-y-3">
           <label className="block">
-            <div className="text-xs text-black/50 mb-1">Код</div>
+            <div className="text-xs text-black/50 mb-1">Телефон</div>
             <input
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              placeholder="123456"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="+7 999 123-45-67"
               className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm bg-white/60 outline-none focus:ring-2 focus:ring-black/10"
-              disabled={loading}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") verify();
-              }}
+              disabled={loading || stage === "code"}
             />
           </label>
-        ) : null}
 
-        {stage === "phone" ? (
-          <button
-            onClick={request}
-            disabled={loading || phone.trim().length < 10}
-            className="w-full rounded-xl border px-3 py-2 text-sm hover:bg-white/70 disabled:opacity-50"
-            type="button"
-          >
-            Получить код
-          </button>
-        ) : (
-          <>
+          {stage === "code" ? (
+            <label className="block">
+              <div className="text-xs text-black/50 mb-1">Код</div>
+              <input
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                placeholder="123456"
+                className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm bg-white/60 outline-none focus:ring-2 focus:ring-black/10"
+                disabled={loading}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") verify();
+                }}
+              />
+            </label>
+          ) : null}
+
+          {stage === "phone" ? (
             <button
-              onClick={verify}
-              disabled={loading || code.trim().length < 4}
+              onClick={request}
+              disabled={loading || phone.trim().length < 10}
               className="w-full rounded-xl border px-3 py-2 text-sm hover:bg-white/70 disabled:opacity-50"
               type="button"
             >
-              Войти
+              Получить код
             </button>
+          ) : (
+            <>
+              <button
+                onClick={verify}
+                disabled={loading || code.trim().length < 4}
+                className="w-full rounded-xl border px-3 py-2 text-sm hover:bg-white/70 disabled:opacity-50"
+                type="button"
+              >
+                Войти
+              </button>
 
-            <button
-              onClick={() => {
-                setStage("phone");
-                setCode("");
-                setHint(null);
-              }}
-              className="w-full text-xs text-black/50 hover:text-black transition"
-              type="button"
-            >
-              Изменить номер
-            </button>
-          </>
-        )}
-      </div>
+              <button
+                onClick={() => {
+                  setStage("phone");
+                  setCode("");
+                  setHint(null);
+                }}
+                className="w-full text-xs text-black/50 hover:text-black transition"
+                type="button"
+              >
+                Изменить номер
+              </button>
+            </>
+          )}
+        </div>
+      </Reveal>
     </div>
   );
 }

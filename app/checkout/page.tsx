@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useCart } from "@/components/cart/CartProvider";
 import { getUserProfile, mergeUserProfile } from "@/app/lib/userProfile";
+import { Reveal } from "@/components/Reveal";
 
 type CheckoutForm = {
   name: string;
@@ -225,132 +226,138 @@ export default function CheckoutPage() {
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-10">
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Оформление заказа</h1>
-        <div className="text-sm text-neutral-600">
-          Итого: <span className="font-medium text-neutral-900">{total} ₽</span>
+      <Reveal>
+        <div className="mb-6 flex items-center justify-between">
+          <h1 className="text-xl font-semibold">Оформление заказа</h1>
+          <div className="text-sm text-neutral-600">
+            Итого: <span className="font-medium text-neutral-900">{total} ₽</span>
+          </div>
         </div>
-      </div>
+      </Reveal>
 
       {isCartEmpty ? (
-        <div className="rounded-2xl border border-neutral-200 bg-white p-6">
-          <div className="text-sm text-neutral-700">Корзина пуста.</div>
-          <button
-            className="mt-4 inline-flex rounded-full bg-black px-5 py-2.5 text-sm font-medium text-white"
-            onClick={() => router.push("/products")}
-          >
-            Перейти в каталог
-          </button>
-        </div>
+        <Reveal delay={0.1}>
+          <div className="rounded-2xl border border-neutral-200 bg-white p-6">
+            <div className="text-sm text-neutral-700">Корзина пуста.</div>
+            <button
+              className="mt-4 inline-flex rounded-full bg-black px-5 py-2.5 text-sm font-medium text-white"
+              onClick={() => router.push("/products")}
+            >
+              Перейти в каталог
+            </button>
+          </div>
+        </Reveal>
       ) : (
-        <form onSubmit={onSubmit} className="rounded-2xl border border-neutral-200 bg-white p-5 sm:p-6">
-          <div className="grid gap-3">
-            <input
-              className="h-12 rounded-xl border border-neutral-200 px-4 text-sm outline-none focus:border-neutral-400"
-              placeholder="Имя *"
-              value={form.name}
-              onChange={(e) => setField("name", e.target.value)}
-              disabled={submitting}
-            />
-
-            <input
-              className="h-12 rounded-xl border border-neutral-200 px-4 text-sm outline-none focus:border-neutral-400"
-              placeholder="Телефон *"
-              value={form.phone}
-              onChange={(e) => setField("phone", e.target.value)}
-              disabled={submitting}
-            />
-
-            <input
-              className="h-12 rounded-xl border border-neutral-200 px-4 text-sm outline-none focus:border-neutral-400"
-              placeholder="Телеграм (необязательно)"
-              value={form.telegram || ""}
-              onChange={(e) => setField("telegram", e.target.value)}
-              disabled={submitting}
-            />
-
-            {/* ✅ Блок ПВЗ */}
-            <div className="mt-2 rounded-2xl border border-neutral-200 p-4">
-              <div className="text-sm font-medium">Доставка: СДЭК (ПВЗ)</div>
-              <div className="mt-1 text-xs text-neutral-500">
-                Пока без автоматической интеграции: укажи ПВЗ, мы оформим отправку вручную.
-              </div>
-
-              <div className="mt-3 grid gap-3">
-                <input
-                  className="h-12 rounded-xl border border-neutral-200 px-4 text-sm outline-none focus:border-neutral-400"
-                  placeholder="Город ПВЗ *"
-                  value={form.pvzCity || ""}
-                  onChange={(e) => setField("pvzCity", e.target.value)}
-                  disabled={submitting}
-                />
-                <input
-                  className="h-12 rounded-xl border border-neutral-200 px-4 text-sm outline-none focus:border-neutral-400"
-                  placeholder="Адрес/название ПВЗ *"
-                  value={form.pvzAddress || ""}
-                  onChange={(e) => setField("pvzAddress", e.target.value)}
-                  disabled={submitting}
-                />
-                <input
-                  className="h-12 rounded-xl border border-neutral-200 px-4 text-sm outline-none focus:border-neutral-400"
-                  placeholder="Код ПВЗ (если есть)"
-                  value={form.pvzCode || ""}
-                  onChange={(e) => setField("pvzCode", e.target.value)}
-                  disabled={submitting}
-                />
-              </div>
-            </div>
-
-            <textarea
-              className="min-h-[120px] rounded-xl border border-neutral-200 px-4 py-3 text-sm outline-none focus:border-neutral-400"
-              placeholder="Комментарий к заказу"
-              value={form.comment || ""}
-              onChange={(e) => setField("comment", e.target.value)}
-              disabled={submitting}
-            />
-
-            {/* ✅ Согласие на обработку ПД */}
-            <label className="mt-2 flex items-start gap-3 text-xs text-neutral-600">
+        <Reveal delay={0.1}>
+          <form onSubmit={onSubmit} className="rounded-2xl border border-neutral-200 bg-white p-5 sm:p-6">
+            <div className="grid gap-3">
               <input
-                type="checkbox"
-                checked={agree}
-                onChange={(e) => setAgree(e.target.checked)}
-                className="mt-1 h-4 w-4 accent-black"
+                className="h-12 rounded-xl border border-neutral-200 px-4 text-sm outline-none focus:border-neutral-400"
+                placeholder="Имя *"
+                value={form.name}
+                onChange={(e) => setField("name", e.target.value)}
                 disabled={submitting}
               />
-              <span>
-                Я даю согласие на обработку персональных данных в соответствии с{" "}
-                <a
-                  href="/privacy"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="underline hover:opacity-70"
-                >
-                  Политикой конфиденциальности
-                </a>
-                .
-              </span>
-            </label>
 
-            {error ? (
-              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                {error}
+              <input
+                className="h-12 rounded-xl border border-neutral-200 px-4 text-sm outline-none focus:border-neutral-400"
+                placeholder="Телефон *"
+                value={form.phone}
+                onChange={(e) => setField("phone", e.target.value)}
+                disabled={submitting}
+              />
+
+              <input
+                className="h-12 rounded-xl border border-neutral-200 px-4 text-sm outline-none focus:border-neutral-400"
+                placeholder="Телеграм (необязательно)"
+                value={form.telegram || ""}
+                onChange={(e) => setField("telegram", e.target.value)}
+                disabled={submitting}
+              />
+
+              {/* ✅ Блок ПВЗ */}
+              <div className="mt-2 rounded-2xl border border-neutral-200 p-4">
+                <div className="text-sm font-medium">Доставка: СДЭК (ПВЗ)</div>
+                <div className="mt-1 text-xs text-neutral-500">
+                  Пока без автоматической интеграции: укажи ПВЗ, мы оформим отправку вручную.
+                </div>
+
+                <div className="mt-3 grid gap-3">
+                  <input
+                    className="h-12 rounded-xl border border-neutral-200 px-4 text-sm outline-none focus:border-neutral-400"
+                    placeholder="Город ПВЗ *"
+                    value={form.pvzCity || ""}
+                    onChange={(e) => setField("pvzCity", e.target.value)}
+                    disabled={submitting}
+                  />
+                  <input
+                    className="h-12 rounded-xl border border-neutral-200 px-4 text-sm outline-none focus:border-neutral-400"
+                    placeholder="Адрес/название ПВЗ *"
+                    value={form.pvzAddress || ""}
+                    onChange={(e) => setField("pvzAddress", e.target.value)}
+                    disabled={submitting}
+                  />
+                  <input
+                    className="h-12 rounded-xl border border-neutral-200 px-4 text-sm outline-none focus:border-neutral-400"
+                    placeholder="Код ПВЗ (если есть)"
+                    value={form.pvzCode || ""}
+                    onChange={(e) => setField("pvzCode", e.target.value)}
+                    disabled={submitting}
+                  />
+                </div>
               </div>
-            ) : null}
 
-            <button
-              type="submit"
-              disabled={submitting || !agree}
-              className="mt-2 h-12 rounded-full bg-black text-sm font-medium text-white disabled:opacity-60"
-            >
-              {submitting ? "Оформляем..." : "Перейти к оплате"}
-            </button>
+              <textarea
+                className="min-h-[120px] rounded-xl border border-neutral-200 px-4 py-3 text-sm outline-none focus:border-neutral-400"
+                placeholder="Комментарий к заказу"
+                value={form.comment || ""}
+                onChange={(e) => setField("comment", e.target.value)}
+                disabled={submitting}
+              />
 
-            <div className="text-center text-xs text-neutral-500">
-              {loadingMe ? "Загружаем данные…" : "После оплаты вы будете перенаправлены на страницу подтверждения"}
+              {/* ✅ Согласие на обработку ПД */}
+              <label className="mt-2 flex items-start gap-3 text-xs text-neutral-600">
+                <input
+                  type="checkbox"
+                  checked={agree}
+                  onChange={(e) => setAgree(e.target.checked)}
+                  className="mt-1 h-4 w-4 accent-black"
+                  disabled={submitting}
+                />
+                <span>
+                  Я даю согласие на обработку персональных данных в соответствии с{" "}
+                  <a
+                    href="/privacy"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="underline hover:opacity-70"
+                  >
+                    Политикой конфиденциальности
+                  </a>
+                  .
+                </span>
+              </label>
+
+              {error ? (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {error}
+                </div>
+              ) : null}
+
+              <button
+                type="submit"
+                disabled={submitting || !agree}
+                className="mt-2 h-12 rounded-full bg-black text-sm font-medium text-white disabled:opacity-60"
+              >
+                {submitting ? "Оформляем..." : "Перейти к оплате"}
+              </button>
+
+              <div className="text-center text-xs text-neutral-500">
+                {loadingMe ? "Загружаем данные…" : "После оплаты вы будете перенаправлены на страницу подтверждения"}
+              </div>
             </div>
-          </div>
-        </form>
+          </form>
+        </Reveal>
       )}
     </main>
   );

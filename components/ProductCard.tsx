@@ -43,13 +43,14 @@ export function ProductCard({
             src={img}
             alt={title}
             fill
-            className="object-cover transition-transform duration-500 ease-out group-hover:scale-[1.03]"
+            className="object-cover transition-transform duration-700 ease-[cubic-bezier(0.25,0.46,0.45,0.94)] group-hover:scale-[1.05]"
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
             priority={false}
           />
+          <div className="absolute inset-0 z-10 bg-black/0 transition-colors duration-500 group-hover:bg-black/[0.04]" />
 
           {badge && (
-            <span className="absolute left-3 top-3 rounded-full bg-white/90 px-2.5 py-1 text-[10px] uppercase tracking-wide text-black shadow-sm backdrop-blur">
+            <span className="absolute left-3 top-3 z-20 rounded-full bg-white/90 px-2.5 py-1 text-[10px] uppercase tracking-wide text-black shadow-sm backdrop-blur">
               {badge}
             </span>
           )}
@@ -57,7 +58,7 @@ export function ProductCard({
 
         {/* CONTENT */}
         <div className="pt-3">
-          <h3 className="line-clamp-2 text-[13px] font-medium leading-snug text-black sm:text-sm md:text-base">
+          <h3 className="line-clamp-2 text-[13px] font-medium leading-snug text-black sm:text-sm md:text-base transition-colors duration-300 group-hover:text-black/70">
             {title}
           </h3>
 
@@ -71,7 +72,7 @@ export function ProductCard({
 
       {/* ACTIONS (кнопка добавить и т.п.) */}
       {actions && (
-        <div className="mt-2 transition-all duration-300 ease-out md:opacity-0 md:translate-y-1 md:group-hover:opacity-100 md:group-hover:translate-y-0">
+        <div className="mt-2 transition-all duration-500 ease-[cubic-bezier(0.25,0.46,0.45,0.94)] md:opacity-0 md:translate-y-2 md:group-hover:opacity-100 md:group-hover:translate-y-0">
           {actions}
         </div>
       )}
