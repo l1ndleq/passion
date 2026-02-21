@@ -38,12 +38,20 @@ export function SupportWidget() {
     // Session initialization
     useEffect(() => {
         if (typeof window !== "undefined") {
-            let storedId = localStorage.getItem("passion_support_session");
-            if (!storedId) {
-                storedId = crypto.randomUUID();
-                localStorage.setItem("passion_support_session", storedId);
+            try {
+                let storedId = localStorage.getItem("passion_support_session");
+                if (!storedId) {
+                    storedId = (typeof crypto !== "undefined" && crypto.randomUUID)
+                        ? crypto.randomUUID()
+                        : Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
+                    localStorage.setItem("passion_support_session", storedId);
+                }
+                setSessionId(storedId);
+            } catch (e) {
+                console.error("Local storage error:", e);
+                // Fallback for strict privacy modes
+                setSessionId(Math.random().toString(36).substring(2, 15));
             }
-            setSessionId(storedId);
         }
     }, [isOpen]);
 
@@ -87,13 +95,16 @@ export function SupportWidget() {
     const onSubmit = async (data: SupportForm) => {
         if (!sessionId) return;
 
-        const textMessage = data.message.trim();
+        const textMessage = data.message?.trim();
         if (!textMessage) return;
 
         // Optimistic UI update
-        const tempId = crypto.randomUUID();
+        const tempId = (typeof crypto !== "undefined" && crypto.randomUUID)
+            ? crypto.randomUUID()
+            : Math.random().toString(36).substring(2, 15);
+
         setMessages((prev) => [
-            ...prev,
+            ...(Array.isArray(prev) ? prev : []),
             { id: tempId, sender: "user", text: textMessage, timestamp: Date.now() },
         ]);
 
@@ -195,18 +206,24 @@ export function SupportWidget() {
                             </div>
                         </div>
 
-                        {messages.map((msg, i) => (
-                            <div key={msg.id || i} className={`flex items-end gap-2 ${msg.sender === "user" ? "flex-row-reverse" : ""}`}>
-                                {msg.sender === "admin" && (
-                                    <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-neutral-200 text-[10px] font-semibold">
-                                        P
+                        {(Array.isArray(messages) ? messages : []).map((msg, i) => {
+                            if (!msg) return null;
+                            const sender = msg.sender === "admin" ? "admin" : "user";
+                            const text = msg.text || "";
+
+                            return (
+                                <div key={msg.id || i} className={`flex items-end gap-2 ${sender === "user" ? "flex-row-reverse" : ""}`}>
+                                    {sender === "admin" && (
+                                        <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-neutral-200 text-[10px] font-semibold">
+                                            P
+                                        </div>
+                                    )}
+                                    <div className={`max-w-[80%] rounded-2xl p-3 text-sm shadow-sm ${sender === "user" ? "bg-black text-white rounded-br-sm" : "bg-white text-neutral-800 rounded-bl-sm"}`}>
+                                        {text}
                                     </div>
-                                )}
-                                <div className={`max-w-[80%] rounded-2xl p-3 text-sm shadow-sm ${msg.sender === "user" ? "bg-black text-white rounded-br-sm" : "bg-white text-neutral-800 rounded-bl-sm"}`}>
-                                    {msg.text}
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                         <div ref={messagesEndRef} />
                     </div>
 
