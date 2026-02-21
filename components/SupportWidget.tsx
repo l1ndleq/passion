@@ -62,7 +62,8 @@ export function SupportWidget() {
                     }
                 }
             } catch (error) {
-                console.error("Failed to fetch support chat messages:", error);
+                // Ошибки сети или блокировщиков рекламы игнорируем, чтобы не 
+                // спамить overlay в dev-режиме каждые 5 секунд.
             }
         };
 
