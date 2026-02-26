@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import ProductsGridClient from "@/components/ProductsGridClient";
-import { PRODUCTS } from "@/app/lib/products";
 import CartLinkClientOnly from "@/components/CartLinkClientOnly";
 import { Reveal } from "@/components/Reveal";
 
@@ -34,7 +33,7 @@ export default function ProductsPage() {
       <Reveal delay={0.1}>
         <div className="mt-10">
           <Suspense fallback={null}>
-            <ProductsGridClient products={PRODUCTS} />
+            <ProductsGridClient />
           </Suspense>
         </div>
       </Reveal>

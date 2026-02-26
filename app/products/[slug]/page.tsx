@@ -134,7 +134,7 @@ export default async function ProductPage({
                 </Link>
               </div>
 
-              <ProductsGridClient products={others} />
+              <ProductsGridClient />
             </section>
           ) : null}
         </div>

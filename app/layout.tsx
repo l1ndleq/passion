@@ -10,6 +10,7 @@ import CartLinkClientOnly from "@/components/CartLinkClientOnly";
 import { Inter, Cormorant_Garamond } from "next/font/google";
 import MiniCartDrawer from "@/components/MiniCartDrawer";
 import { SupportWidget } from "@/components/SupportWidget";
+import { DynamicBackground } from "@/components/DynamicBackground";
 
 const inter = Inter({
   subsets: ["latin", "cyrillic"],
@@ -42,8 +43,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="ru" className={`${inter.variable} ${cormorant.variable}`}>
       <body>
+        <DynamicBackground />
         <AppProviders>
-          <div className="min-h-screen bg-[#fbf7f3] text-[#141414]">
+          <div className="min-h-screen bg-transparent text-[#141414]">
             <StickyHeader>
               <header className="border-b border-black/10 bg-white/60 backdrop-blur">
                 <div className="mx-auto flex h-12 max-w-6xl items-center px-5 relative">

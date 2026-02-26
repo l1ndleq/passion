@@ -1,48 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { ProductCard } from "@/components/ProductCard";
 import Image from "next/image";
 import { Reveal } from "@/components/Reveal";
 import { InfiniteMarquee } from "@/components/InfiniteMarquee";
 import { useRef } from "react";
 import { motion, useScroll, useTransform } from "framer-motion";
-
-type Product = {
-  slug: string;
-  name: string;
-  subtitle: string;
-  category: string;
-  note: string;
-  image?: string;
-  badge?: string;
-};
-
-const featured: Product[] = [
-  {
-    slug: "silk-cleanser",
-    name: "Шелковый очищающий гель",
-    subtitle: "Нежное очищение",
-    category: "Очищение",
-    note: "Мягкое ежедневное очищение, которое сохраняет комфорт кожи.",
-    badge: "Новинка",
-  },
-  {
-    slug: "glow-serum",
-    name: "Сияющая сыворотка",
-    subtitle: "Ежедневное сияние",
-    category: "Сыворотка",
-    note: "Лёгкая формула для ровного тона и естественного сияния кожи.",
-    badge: "Хит продаж",
-  },
-  {
-    slug: "soft-cream",
-    name: "Мягкий крем",
-    subtitle: "Поддержка барьера",
-    category: "Крем",
-    note: "Поддержка кожного барьера и ощущение уюта в течение дня.",
-  },
-];
 
 export default function HomePage() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -184,30 +147,12 @@ export default function HomePage() {
 
           </div>
 
-          <div className="mt-10 grid gap-5 md:grid-cols-3">
-            {featured.map((p, idx) => (
-              <ProductCard
-                key={p.slug}
-                href={`/products/${p.slug}`}
-                title={`${p.name} · ${p.subtitle}`}
-                price={0}
-                image={"/images/placeholder-product.jpg"}
-                badge={p.category}
-                actions={
-                  <span
-                    className="inline-flex items-center justify-center rounded-full
-             bg-neutral-900 px-4 py-2
-             text-xs font-semibold tracking-wide text-white
-             transition-[background-color,transform,opacity] duration-300 ease-out
-             group-hover:bg-neutral-800 group-hover:opacity-95
-             group-active:scale-[0.98]"
-                  >
-                    Перейти →
-                  </span>
-
-                }
-              />
-            ))}
+          <div className="mt-10 rounded-3xl border border-black/10 bg-white/60 p-8 text-center shadow-sm">
+            <div className="text-xs uppercase tracking-[0.2em] text-black/50">Ассортимент</div>
+            <h3 className="mt-3 text-2xl font-semibold text-black/90">Скоро всё будет</h3>
+            <p className="mt-2 text-sm text-black/60">
+              Сейчас обновляем витрину. Карточки товаров скоро появятся.
+            </p>
           </div>
 
 
