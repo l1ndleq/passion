@@ -94,7 +94,12 @@ export default function WaitlistLaunchButton({ source, className }: Props) {
         } else if (data?.error === "WAITLIST_FAILED") {
           setError("Сервис ожидания временно недоступен. Попробуйте чуть позже.");
         } else {
-          setError("Не удалось сохранить заявку. Попробуйте еще раз.");
+          const code = String(data?.error || "").trim();
+          setError(
+            code
+              ? `Не удалось сохранить заявку (${code}). Попробуйте еще раз.`
+              : `Не удалось сохранить заявку (HTTP ${res.status}). Попробуйте еще раз.`
+          );
         }
         return;
       }

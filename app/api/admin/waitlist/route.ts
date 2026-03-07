@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { redis } from "@/app/lib/redis";
+import { Redis } from "@upstash/redis";
 import {
   WAITLIST_INDEX_KEY,
   waitlistEntryKey,
@@ -20,6 +20,17 @@ type WaitlistEntry = {
   lastSource: WaitlistSource;
 };
 
+function getRedisOrNull() {
+  const url = String(process.env.UPSTASH_REDIS_REST_URL || "").trim();
+  const token = String(process.env.UPSTASH_REDIS_REST_TOKEN || "").trim();
+  if (!url || !token) return null;
+  try {
+    return new Redis({ url, token });
+  } catch {
+    return null;
+  }
+}
+
 function toNumber(value: unknown) {
   const n = Number(value);
   return Number.isFinite(n) ? Math.floor(n) : 0;
@@ -27,6 +38,28 @@ function toNumber(value: unknown) {
 
 export async function GET() {
   try {
+    const redis = getRedisOrNull();
+    if (!redis) {
+      return NextResponse.json({
+        ok: true,
+        degraded: true,
+        stats: {
+          clicksTotal: 0,
+          clicksHome: 0,
+          clicksCatalog: 0,
+          submitsTotal: 0,
+          submitsHome: 0,
+          submitsCatalog: 0,
+          submitsTelegram: 0,
+          submitsEmail: 0,
+          uniqueTotal: 0,
+          uniqueTelegram: 0,
+          uniqueEmail: 0,
+        },
+        entries: [],
+      });
+    }
+
     const statFields = [
       "clicks_total",
       "clicks_home",

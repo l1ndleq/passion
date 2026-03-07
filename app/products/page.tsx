@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { Suspense } from "react";
 import ProductsGridClient from "@/components/ProductsGridClient";
 import WaitlistLaunchButton from "@/components/WaitlistLaunchButton";
@@ -44,20 +43,10 @@ export default function ProductsPage() {
             Как только откроем продажи, отправим вам уведомление в Telegram или на email.
           </p>
 
-          <div className="mt-5 flex flex-wrap gap-3">
-            <Link
-              href="/"
-              className="inline-flex items-center justify-center rounded-full
-                         border border-neutral-300 bg-white/60 backdrop-blur
-                         px-6 py-3 text-sm font-semibold tracking-wide text-neutral-900
-                         transition-[background-color,transform] duration-300
-                         hover:bg-neutral-100 active:scale-[0.98]"
-            >
-              На главную
-            </Link>
+          <div className="mt-5 flex">
             <WaitlistLaunchButton
               source="catalog"
-              className="inline-flex h-12 w-full items-center justify-center rounded-full bg-black px-6 text-sm font-semibold tracking-wide uppercase text-white hover:opacity-90 transition sm:w-auto"
+              className="inline-flex h-12 w-full items-center justify-center rounded-full bg-black px-6 text-sm font-semibold tracking-wide uppercase text-white hover:opacity-90 transition"
             />
           </div>
         </div>

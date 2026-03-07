@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { redis } from "@/app/lib/redis";
+import { Redis } from "@upstash/redis";
 import {
   WAITLIST_INDEX_KEY,
   parseWaitlistChannel,
@@ -22,7 +22,19 @@ type WaitlistEntry = {
   lastSource: "home" | "catalog";
 };
 
-async function incStat(field: string) {
+function getRedisOrNull() {
+  const url = String(process.env.UPSTASH_REDIS_REST_URL || "").trim();
+  const token = String(process.env.UPSTASH_REDIS_REST_TOKEN || "").trim();
+  if (!url || !token) return null;
+  try {
+    return new Redis({ url, token });
+  } catch {
+    return null;
+  }
+}
+
+async function incStat(redis: Redis | null, field: string) {
+  if (!redis) return;
   await redis.incr(waitlistStatKey(field));
 }
 
@@ -103,6 +115,7 @@ async function sendLoginBotToUser(chatId: number | string, text: string) {
 
 export async function POST(req: Request) {
   try {
+    const redis = getRedisOrNull();
     const body = await req.json().catch(() => ({}));
     const action = String(body?.action || "subscribe").trim().toLowerCase();
     const source = parseWaitlistSource(body?.source);
@@ -116,7 +129,7 @@ export async function POST(req: Request) {
     }
 
     if (action === "click") {
-      await Promise.all([incStat("clicks_total"), incStat(`clicks_${source}`)]);
+      await Promise.all([incStat(redis, "clicks_total"), incStat(redis, `clicks_${source}`)]);
 
       await sendAdminWaitlistAlert(
         [
@@ -152,39 +165,43 @@ export async function POST(req: Request) {
     let existing: WaitlistEntry | null = null;
     let storageOk = true;
     try {
-      const entryId = `${channel}:${contact}`;
-      const key = waitlistEntryKey(entryId);
-      existing = await redis.get<WaitlistEntry>(key);
+      if (redis) {
+        const entryId = `${channel}:${contact}`;
+        const key = waitlistEntryKey(entryId);
+        existing = await redis.get<WaitlistEntry>(key);
 
-      const next: WaitlistEntry = {
-        channel,
-        contact,
-        createdAt:
-          existing && Number.isFinite(Number(existing.createdAt))
-            ? Math.floor(Number(existing.createdAt))
-            : now,
-        updatedAt: now,
-        firstSource:
-          existing?.firstSource === "home" || existing?.firstSource === "catalog"
-            ? existing.firstSource
-            : source,
-        lastSource: source,
-      };
+        const next: WaitlistEntry = {
+          channel,
+          contact,
+          createdAt:
+            existing && Number.isFinite(Number(existing.createdAt))
+              ? Math.floor(Number(existing.createdAt))
+              : now,
+          updatedAt: now,
+          firstSource:
+            existing?.firstSource === "home" || existing?.firstSource === "catalog"
+              ? existing.firstSource
+              : source,
+          lastSource: source,
+        };
 
-      await redis.set(key, next);
-      await redis.sadd(WAITLIST_INDEX_KEY, entryId);
+        await redis.set(key, next);
+        await redis.sadd(WAITLIST_INDEX_KEY, entryId);
 
-      const statOps = [
-        incStat("submits_total"),
-        incStat(`submits_${source}`),
-        incStat(`submits_${channel}`),
-      ];
+        const statOps = [
+          incStat(redis, "submits_total"),
+          incStat(redis, `submits_${source}`),
+          incStat(redis, `submits_${channel}`),
+        ];
 
-      if (!existing) {
-        statOps.push(incStat("unique_total"), incStat(`unique_${channel}`));
+        if (!existing) {
+          statOps.push(incStat(redis, "unique_total"), incStat(redis, `unique_${channel}`));
+        }
+
+        await Promise.all(statOps);
+      } else {
+        storageOk = false;
       }
-
-      await Promise.all(statOps);
     } catch {
       storageOk = false;
     }
@@ -193,7 +210,7 @@ export async function POST(req: Request) {
     if (channel === "telegram") {
       try {
         const username = usernameFromContact(contact);
-        if (username) {
+        if (username && redis) {
           const chatId = await redis.get<number | string>(`tg:username:${username}`);
           if (chatId) {
             userNotified = await sendLoginBotToUser(
@@ -235,6 +252,6 @@ export async function POST(req: Request) {
         `Ошибка: <code>${escapeHtml(error instanceof Error ? error.message : "WAITLIST_FAILED")}</code>`,
       ].join("\n")
     );
-    return NextResponse.json({ ok: true, degraded: true });
+    return NextResponse.json({ ok: true, degraded: true, userNotified: false, storageOk: false });
   }
 }
