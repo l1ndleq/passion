@@ -1,4 +1,3 @@
-import { redis } from "@/app/lib/redis";
 import { hashOtp as hashOtpWithPhone } from "@/src/lib/otp";
 
 const OTP_TTL_SECONDS = 5 * 60; // 5 минут
@@ -18,6 +17,11 @@ type MemoryOtpRecord = {
 
 const memoryOtp = new Map<string, MemoryOtpRecord>();
 const memoryCooldown = new Map<string, number>();
+
+async function getRedisClient() {
+  const mod = await import("@/app/lib/redis");
+  return mod.redis;
+}
 
 function normalizePhone(raw: string) {
   let s = String(raw || "").trim().replace(/[^\d+]/g, "");
@@ -61,6 +65,8 @@ export async function requestOtp(rawPhone: string) {
     memoryCooldown.set(phone, now + OTP_RESEND_COOLDOWN_SECONDS * 1000);
     return { phone, code, ttlSeconds: OTP_TTL_SECONDS };
   }
+
+  const redis = await getRedisClient();
 
   // cooldown
   const cooldown = await redis.get<number>(otpCooldownKey(phone));
@@ -110,6 +116,8 @@ export async function verifyOtp(rawPhone: string, rawCode: string) {
     memoryOtp.delete(phone);
     return { phone };
   }
+
+  const redis = await getRedisClient();
 
   const data = await redis.get<any>(otpKey(phone));
   if (!data) throw new Error("OTP_EXPIRED");
