@@ -22,6 +22,27 @@ export default function LoginClient() {
       ? nextPathRaw
       : "/account";
 
+  function humanizeError(codeRaw: unknown) {
+    const code = String(codeRaw || "").trim().toUpperCase();
+    if (!code) return "Ошибка. Попробуйте еще раз.";
+
+    const map: Record<string, string> = {
+      PHONE_INVALID: "Некорректный телефон.",
+      PHONE_REQUIRED: "Укажите номер телефона.",
+      CODE_REQUIRED: "Введите код из сообщения.",
+      OTP_TOO_SOON: "Слишком часто. Подождите немного и попробуйте снова.",
+      OTP_INVALID: "Неверный код.",
+      OTP_EXPIRED: "Код истек. Запросите новый.",
+      OTP_ATTEMPTS_EXCEEDED: "Слишком много попыток. Запросите новый код.",
+      TOO_MANY_REQUESTS: "Слишком много запросов. Повторите позже.",
+      CONFIG_ERROR: "Сервер временно не настроен для входа. Попробуйте позже.",
+      REQUEST_OTP_FAILED: "Не удалось отправить код. Попробуйте еще раз.",
+      VERIFY_OTP_FAILED: "Не удалось выполнить вход. Попробуйте еще раз.",
+    };
+
+    return map[code] || `Ошибка: ${code}`;
+  }
+
   async function request() {
     setLoading(true);
     setError(null);
@@ -37,7 +58,7 @@ export default function LoginClient() {
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        setError(data?.error || `HTTP ${res.status}`);
+        setError(humanizeError(data?.error || `HTTP_${res.status}`));
         return;
       }
 
@@ -71,7 +92,7 @@ export default function LoginClient() {
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        setError(data?.error || `HTTP ${res.status}`);
+        setError(humanizeError(data?.error || `HTTP_${res.status}`));
         return;
       }
 

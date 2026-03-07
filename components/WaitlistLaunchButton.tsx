@@ -78,6 +78,8 @@ export default function WaitlistLaunchButton({ source, className }: Props) {
         error?: string;
         alreadySubscribed?: boolean;
         userNotified?: boolean;
+        pendingStored?: boolean;
+        storageOk?: boolean;
       };
 
       if (!res.ok || !data?.ok) {
@@ -107,10 +109,19 @@ export default function WaitlistLaunchButton({ source, className }: Props) {
       const baseMessage = data.alreadySubscribed
         ? "Вы уже в списке. Мы напомним о старте продаж."
         : "Готово. Мы сообщим, когда продажи откроются.";
-      if (channel === "telegram" && !data.userNotified) {
-        setOkMessage(
-          `${baseMessage} Если бот еще не написал вам, отправьте login-боту /start или любое сообщение.`
-        );
+      if (channel === "telegram") {
+        if (data.userNotified) {
+          setOkMessage(baseMessage);
+        } else if (data.pendingStored) {
+          setOkMessage(
+            `${baseMessage} Если бот еще не написал вам, отправьте login-боту /start или любое сообщение.`
+          );
+        } else {
+          setError(
+            "Заявка сохранена, но Telegram-уведомление сейчас недоступно. Проверьте, что вы писали login-боту, и попробуйте позже."
+          );
+          return;
+        }
       } else {
         setOkMessage(baseMessage);
       }
