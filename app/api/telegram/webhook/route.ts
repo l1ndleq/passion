@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { redis } from "@/app/lib/redis";
 import { PRODUCTS } from "@/app/lib/products";
 import { buildOrderTrackingUrl } from "@/app/lib/orderAccess";
+import { waitlistPendingTelegramKey } from "@/app/lib/waitlist";
 
 const BOT_TOKEN =
   String(process.env.TELEGRAM_LOGIN_BOT_TOKEN || "").trim() ||
@@ -242,6 +243,25 @@ async function saveUsernameBinding(chatId: number | string, usernameRaw: unknown
   if (!username) return;
   await redis.set(`tg:username:${username}`, Number(chatId));
   await redis.set(`tg:chat_username:${chatId}`, username);
+}
+
+async function flushPendingWaitlistNotice(chatId: number | string, usernameRaw: unknown) {
+  try {
+    const username = normalizeTelegramUsername(usernameRaw);
+    if (!username) return;
+
+    const pendingKey = waitlistPendingTelegramKey(username);
+    const pending = await redis.get<{ contact?: string }>(pendingKey);
+    if (!pending) return;
+
+    await tgSend(
+      chatId,
+      "✅ Вы в листе ожидания Passion. Сообщим здесь, когда стартуют продажи."
+    );
+    await redis.del(pendingKey);
+  } catch {
+    // Не мешаем основному webhook-флоу.
+  }
 }
 
 async function readCart(chatId: number | string): Promise<BotCart> {
@@ -606,6 +626,7 @@ export async function POST(req: Request) {
     if (callback?.message?.chat?.id) {
       const chatId = callback.message.chat.id;
       await saveUsernameBinding(chatId, callback.from?.username);
+      await flushPendingWaitlistNotice(chatId, callback.from?.username);
       const data = String(callback.data || "").trim();
 
       if (data === "ASK_CONTACT") {
@@ -709,6 +730,7 @@ export async function POST(req: Request) {
     const chatId = msg?.chat?.id;
     if (!chatId) return NextResponse.json({ ok: true });
     await saveUsernameBinding(chatId, msg?.from?.username);
+    await flushPendingWaitlistNotice(chatId, msg?.from?.username);
 
     const text = String(msg?.text || "").trim();
 

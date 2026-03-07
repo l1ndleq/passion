@@ -7,6 +7,7 @@ import {
   normalizeWaitlistEmail,
   normalizeWaitlistTelegram,
   waitlistEntryKey,
+  waitlistPendingTelegramKey,
   waitlistStatKey,
 } from "@/app/lib/waitlist";
 
@@ -207,6 +208,7 @@ export async function POST(req: Request) {
     }
 
     let userNotified = false;
+    let pendingStored = false;
     if (channel === "telegram") {
       try {
         const username = usernameFromContact(contact);
@@ -217,6 +219,18 @@ export async function POST(req: Request) {
               chatId,
               "✅ Вы в листе ожидания Passion. Сообщим здесь, когда стартуют продажи."
             );
+          }
+          if (!userNotified) {
+            await redis.set(
+              waitlistPendingTelegramKey(username),
+              {
+                source,
+                contact: `@${username}`,
+                createdAt: now,
+              },
+              { ex: 60 * 60 * 24 * 30 }
+            );
+            pendingStored = true;
           }
         }
       } catch {
@@ -233,6 +247,7 @@ export async function POST(req: Request) {
         `Канал: ${escapeHtml(channelLabel)}`,
         `Контакт: <code>${escapeHtml(contact)}</code>`,
         `Уведомлен ботом: ${userNotified ? "да" : "нет"}`,
+        `Ожидает /start: ${pendingStored ? "да" : "нет"}`,
         `Сохранено в БД: ${storageOk ? "да" : "нет"}`,
         `IP: <code>${escapeHtml(ip)}</code>`,
         `Время: ${new Date(now).toLocaleString("ru-RU")}`,
@@ -243,6 +258,7 @@ export async function POST(req: Request) {
       ok: true,
       alreadySubscribed: Boolean(existing),
       userNotified,
+      pendingStored,
       storageOk,
     });
   } catch (error: unknown) {

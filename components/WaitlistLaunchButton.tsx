@@ -108,7 +108,9 @@ export default function WaitlistLaunchButton({ source, className }: Props) {
         ? "Вы уже в списке. Мы напомним о старте продаж."
         : "Готово. Мы сообщим, когда продажи откроются.";
       if (channel === "telegram" && !data.userNotified) {
-        setOkMessage(`${baseMessage} Чтобы получить сообщение в Telegram, сначала напишите login-боту /start.`);
+        setOkMessage(
+          `${baseMessage} Если бот еще не написал вам, отправьте login-боту /start или любое сообщение.`
+        );
       } else {
         setOkMessage(baseMessage);
       }

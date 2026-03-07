@@ -1,6 +1,7 @@
 export const WAITLIST_STATS_PREFIX = "waitlist:stats:";
 export const WAITLIST_INDEX_KEY = "waitlist:index";
 export const WAITLIST_ENTRY_PREFIX = "waitlist:entry:";
+export const WAITLIST_PENDING_TG_PREFIX = "waitlist:pending_tg:";
 
 export type WaitlistSource = "home" | "catalog";
 export type WaitlistChannel = "telegram" | "email";
@@ -40,4 +41,8 @@ export function waitlistEntryKey(entryId: string) {
 
 export function waitlistStatKey(field: string) {
   return `${WAITLIST_STATS_PREFIX}${field}`;
+}
+
+export function waitlistPendingTelegramKey(username: string) {
+  return `${WAITLIST_PENDING_TG_PREFIX}${String(username || "").trim().toLowerCase()}`;
 }
