@@ -62,14 +62,22 @@ export async function POST(req: Request) {
     return res;
   } catch (e: any) {
     const msg = e?.message || "VERIFY_OTP_FAILED";
-    const status =
-      msg === "PHONE_REQUIRED" ? 400 :
-      msg === "CODE_REQUIRED" ? 400 :
-      msg === "OTP_INVALID" ? 400 :
-      msg === "OTP_EXPIRED" ? 400 :
-      msg === "OTP_ATTEMPTS_EXCEEDED" ? 429 :
-      500;
+    if (msg === "PHONE_REQUIRED") {
+      return NextResponse.json({ ok: false, error: "PHONE_REQUIRED" }, { status: 400 });
+    }
+    if (msg === "CODE_REQUIRED") {
+      return NextResponse.json({ ok: false, error: "CODE_REQUIRED" }, { status: 400 });
+    }
+    if (msg === "OTP_INVALID") {
+      return NextResponse.json({ ok: false, error: "OTP_INVALID" }, { status: 400 });
+    }
+    if (msg === "OTP_EXPIRED") {
+      return NextResponse.json({ ok: false, error: "OTP_EXPIRED" }, { status: 400 });
+    }
+    if (msg === "OTP_ATTEMPTS_EXCEEDED") {
+      return NextResponse.json({ ok: false, error: "OTP_ATTEMPTS_EXCEEDED" }, { status: 429 });
+    }
 
-    return NextResponse.json({ ok: false, error: msg }, { status });
+    return NextResponse.json({ ok: false, error: "VERIFY_OTP_FAILED" }, { status: 500 });
   }
 }

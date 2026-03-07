@@ -86,8 +86,16 @@ export async function POST(req: Request) {
     });
   } catch (e: any) {
     const msg = e?.message || "REQUEST_OTP_FAILED";
-    const status = msg === "PHONE_INVALID" ? 400 : msg === "OTP_TOO_SOON" ? 429 : 500;
+    if (msg === "PHONE_INVALID") {
+      return NextResponse.json({ ok: false, error: "PHONE_INVALID" }, { status: 400 });
+    }
+    if (msg === "OTP_TOO_SOON") {
+      return NextResponse.json({ ok: false, error: "OTP_TOO_SOON" }, { status: 429 });
+    }
+    if (msg === "OTP_SECRET_MISSING" || msg === "AUTH_SECRET is missing") {
+      return NextResponse.json({ ok: false, error: "CONFIG_ERROR" }, { status: 500 });
+    }
 
-    return NextResponse.json({ ok: false, error: msg }, { status });
+    return NextResponse.json({ ok: false, error: "REQUEST_OTP_FAILED" }, { status: 500 });
   }
 }

@@ -95,7 +95,9 @@ async function sendAdminWaitlistAlert(text: string) {
 }
 
 async function sendLoginBotToUser(chatId: number | string, text: string) {
-  const token = String(process.env.TELEGRAM_LOGIN_BOT_TOKEN || "").trim();
+  const token =
+    String(process.env.TELEGRAM_LOGIN_BOT_TOKEN || "").trim() ||
+    String(process.env.TELEGRAM_BOT_TOKEN || "").trim();
   if (!token) return false;
   try {
     const r = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
