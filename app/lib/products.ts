@@ -8,7 +8,7 @@ export type Product = {
   image?: string;
 };
 
-export const PRODUCTS: Product[] = [
+export const PRODUCT_DRAFTS: Product[] = [
   {
     id: "silk-cleanser",
     title: "Шелковый очищающий гель",
@@ -53,3 +53,6 @@ export const PRODUCTS: Product[] = [
     image: "/images/placeholder-product.jpg",
   },
 ];
+
+// До старта продаж витрина и покупка отключены.
+export const PRODUCTS: Product[] = [];

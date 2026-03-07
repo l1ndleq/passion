@@ -166,9 +166,9 @@ function menuReplyMarkup() {
   return {
     keyboard: [
       [{ text: "🛍 Каталог" }, { text: "🛒 Корзина" }],
-      [{ text: "💳 Оформить заказ" }, { text: "📦 Мои заказы" }],
-      [{ text: "🔎 Найти заказ" }, { text: "👤 Профиль" }],
-      [{ text: "🎟 Промокод" }, { text: "📱 Привязать номер" }],
+      [{ text: "📦 Мои заказы" }, { text: "🔎 Найти заказ" }],
+      [{ text: "👤 Профиль" }, { text: "🎟 Промокод" }],
+      [{ text: "📱 Привязать номер" }],
       [{ text: "❓ Помощь" }],
     ],
     resize_keyboard: true,
@@ -208,7 +208,7 @@ async function tgAnswerCallback(callbackQueryId: string | undefined, text?: stri
 async function sendMainMenu(chatId: number | string) {
   await tgSend(
     chatId,
-    "Главное меню Passion. Используйте кнопки снизу: каталог, корзина, оформление, профиль и заказы.",
+    "Главное меню Passion. Покупки в Telegram временно недоступны: можно смотреть каталог, корзину, профиль и заказы.",
     { reply_markup: menuReplyMarkup() }
   );
 }
@@ -346,6 +346,15 @@ async function sendProfile(chatId: number | string, from?: TelegramUser) {
 }
 
 async function sendCatalog(chatId: number | string) {
+  if (!PRODUCTS.length) {
+    await tgSend(
+      chatId,
+      "🛍 Каталог скоро откроется. Продажи пока не начались.",
+      { reply_markup: menuReplyMarkup() }
+    );
+    return;
+  }
+
   const lines = ["🛍 Каталог", ""];
   for (const p of PRODUCTS) {
     lines.push(`• ${p.title} — ${formatMoney(p.price)} ₽`);
@@ -390,7 +399,6 @@ async function sendCart(chatId: number | string) {
   const inlineKeyboard: Array<Array<{ text: string; callback_data: string }>> = [
     [{ text: "➕ Добавить товары", callback_data: "CATALOG" }],
     [{ text: "🎟 Ввести промокод", callback_data: "PROMO_SET" }],
-    [{ text: "💳 Оформить заказ", callback_data: "CHECKOUT" }],
     [{ text: "🧹 Очистить корзину", callback_data: "CART_CLEAR" }],
   ];
   if (cart.promoCode) {
@@ -515,110 +523,13 @@ async function sendMyOrders(chatId: number | string) {
   });
 }
 
-function localizeCreateOrderError(code: string) {
-  switch (code) {
-    case "ITEMS_REQUIRED":
-      return "Корзина пуста.";
-    case "PHONE_REQUIRED":
-      return "Не найден телефон. Нажмите «📱 Привязать номер».";
-    case "PHONE_INVALID":
-      return "Телефон указан некорректно. Нажмите «📱 Привязать номер».";
-    case "NAME_REQUIRED":
-      return "Не удалось определить имя. Заполните профиль на сайте или напишите имя в чат.";
-    case "TOO_MANY_REQUESTS":
-      return "Слишком много попыток. Повторите чуть позже.";
-    case "PROMO_INVALID":
-      return "Промокод не найден.";
-    case "PROMO_INACTIVE":
-      return "Промокод отключен.";
-    case "PROMO_EXPIRED":
-      return "Срок действия промокода истек.";
-    case "PROMO_USAGE_LIMIT":
-      return "Лимит использований промокода исчерпан.";
-    default:
-      return `Не удалось оформить заказ (${code || "UNKNOWN"}).`;
-  }
-}
-
-function deriveDisplayName(user?: TelegramUser) {
-  const first = String(user?.first_name || "").trim();
-  const last = String(user?.last_name || "").trim();
-  const full = [first, last].filter(Boolean).join(" ").trim();
-  if (full) return full;
-  const username = String(user?.username || "").trim();
-  if (username) return `@${username}`;
-  return "Telegram клиент";
-}
-
 async function checkoutFromBot(chatId: number | string, siteUrl: string, user?: TelegramUser) {
-  const linkedDigits = await getLinkedPhoneDigits(chatId);
-  if (!linkedDigits) {
-    await tgSend(chatId, "Чтобы оформить заказ, сначала привяжите номер телефона.");
-    await requestContact(chatId);
-    return;
-  }
-
-  const cart = await readCart(chatId);
-  const hydrated = hydrateCart(cart);
-  if (!hydrated.items.length) {
-    await tgSend(chatId, "Корзина пустая. Сначала добавьте товары.");
-    return;
-  }
-
-  const profile = await redis.get<{
-    name?: string;
-    phone?: string;
-    city?: string;
-    address?: string;
-  }>(`user:profile:${linkedDigits}`);
-
-  const phoneCandidate = String(profile?.phone || `+${linkedDigits}`);
-  const phone = normalizePhone(phoneCandidate);
-  const name = String(profile?.name || deriveDisplayName(user)).trim();
-  const telegramUsername = String(user?.username || "").trim();
-
-  const body = {
-    customer: {
-      name,
-      phone,
-      telegram: telegramUsername || null,
-      city: String(profile?.city || ""),
-      address: String(profile?.address || ""),
-      message: "Заказ оформлен через Telegram-бота",
-    },
-    items: hydrated.items.map((x) => ({
-      id: x.id,
-      qty: x.qty,
-    })),
-    totalPrice: hydrated.total,
-    promoCode: cart.promoCode || null,
-  };
-
-  const res = await fetch(`${siteUrl}/api/pay/create`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Origin: siteUrl,
-      "x-forwarded-for": `tg-${chatId}`,
-    },
-    body: JSON.stringify(body),
-  });
-
-  const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; orderId?: string };
-  if (!res.ok || !data?.ok) {
-    await tgSend(chatId, localizeCreateOrderError(String(data?.error || "")));
-    return;
-  }
-
-  await clearCart(chatId);
-  const orderId = normalizeOrderId(String(data.orderId || ""));
-  if (!orderId) {
-    await tgSend(chatId, "Заказ создан, но не удалось получить номер. Напишите в поддержку.");
-    return;
-  }
-
-  await tgSend(chatId, `✅ Заказ создан: ${orderId}. Корзина очищена.`);
-  await sendOrderDetails(chatId, orderId, siteUrl);
+  void siteUrl;
+  void user;
+  await tgSend(
+    chatId,
+    "Покупки через Telegram сейчас отключены. Заказы временно не оформляются в боте."
+  );
 }
 
 async function sendHelp(chatId: number | string) {
@@ -627,14 +538,14 @@ async function sendHelp(chatId: number | string) {
     [
       "Управление ботом:",
       "• Кнопки снизу — основной способ.",
-      "• Каталог — добавить товары в корзину.",
-      "• Корзина — проверить и оформить заказ.",
+      "• Каталог — скоро откроется.",
+      "• Корзина — проверить состав и промокод.",
       "• Промокод — добавить/заменить код скидки для корзины.",
       "• Мои заказы — список последних заказов.",
       "• Найти заказ — ввод номера заказа.",
       "",
       "Резервные команды:",
-      "/menu /catalog /cart /promo CODE /checkout /orders /order P-XXXX /profile /help",
+      "/menu /catalog /cart /promo CODE /orders /order P-XXXX /profile /help",
     ].join("\n"),
     { reply_markup: menuReplyMarkup() }
   );
@@ -696,6 +607,11 @@ export async function POST(req: Request) {
       }
 
       if (data.startsWith("CART_ADD:")) {
+        if (!PRODUCTS.length) {
+          await tgAnswerCallback(callback.id, "Продажи пока не открыты");
+          await tgSend(chatId, "Каталог пока закрыт. Мы сообщим о старте отдельно.");
+          return NextResponse.json({ ok: true });
+        }
         const productId = String(data.split(":")[1] || "").trim();
         const p = getProductById(productId);
         if (!p) {
@@ -811,7 +727,7 @@ export async function POST(req: Request) {
 
       await tgSend(
         chatId,
-        "Добро пожаловать в Passion. Теперь каталог, корзина и оформление доступны прямо в этом чате.",
+        "Добро пожаловать в Passion. В этом чате доступны каталог, корзина, профиль и заказы. Покупки в Telegram пока отключены.",
         { reply_markup: menuReplyMarkup() }
       );
       return NextResponse.json({ ok: true });

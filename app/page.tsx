@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { Reveal } from "@/components/Reveal";
 import { InfiniteMarquee } from "@/components/InfiniteMarquee";
+import WaitlistLaunchButton from "@/components/WaitlistLaunchButton";
 import { useRef } from "react";
 import { motion, useScroll, useTransform } from "framer-motion";
 
@@ -41,8 +42,7 @@ export default function HomePage() {
 
 
               <p className="mt-6 max-w-xl text-base md:text-lg text-black/70 leading-relaxed">
-                Современный уход для повседневной жизни.
-                Чистые формулы, мягкие текстуры и спокойная уверенность в результате.
+                Гидролаты в основе формул, благородная мягкость текстур и ровное ощущение комфорта
 
               </p>
 
@@ -53,6 +53,7 @@ export default function HomePage() {
                 >
                   Каталог
                 </Link>
+                <WaitlistLaunchButton source="home" />
 
               </div>
 
@@ -153,6 +154,9 @@ export default function HomePage() {
             <p className="mt-2 text-sm text-black/60">
               Сейчас обновляем витрину. Карточки товаров скоро появятся.
             </p>
+            <div className="mt-6 flex justify-center">
+              <WaitlistLaunchButton source="home" />
+            </div>
           </div>
 
 

@@ -112,6 +112,43 @@ const INITIAL_PROMO_FORM: PromoForm = {
   active: true,
 };
 
+type WaitlistStats = {
+  clicksTotal: number;
+  clicksHome: number;
+  clicksCatalog: number;
+  submitsTotal: number;
+  submitsHome: number;
+  submitsCatalog: number;
+  submitsTelegram: number;
+  submitsEmail: number;
+  uniqueTotal: number;
+  uniqueTelegram: number;
+  uniqueEmail: number;
+};
+
+type WaitlistEntry = {
+  channel: "telegram" | "email";
+  contact: string;
+  createdAt: number;
+  updatedAt: number;
+  firstSource: "home" | "catalog";
+  lastSource: "home" | "catalog";
+};
+
+const EMPTY_WAITLIST_STATS: WaitlistStats = {
+  clicksTotal: 0,
+  clicksHome: 0,
+  clicksCatalog: 0,
+  submitsTotal: 0,
+  submitsHome: 0,
+  submitsCatalog: 0,
+  submitsTelegram: 0,
+  submitsEmail: 0,
+  uniqueTotal: 0,
+  uniqueTelegram: 0,
+  uniqueEmail: 0,
+};
+
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(true);
@@ -124,6 +161,10 @@ export default function AdminOrdersPage() {
   const [promoForm, setPromoForm] = useState<PromoForm>(INITIAL_PROMO_FORM);
   const [promoSaving, setPromoSaving] = useState(false);
   const [promoActionCode, setPromoActionCode] = useState<string | null>(null);
+  const [waitlistStats, setWaitlistStats] = useState<WaitlistStats>(EMPTY_WAITLIST_STATS);
+  const [waitlistEntries, setWaitlistEntries] = useState<WaitlistEntry[]>([]);
+  const [waitlistLoading, setWaitlistLoading] = useState(true);
+  const [waitlistErr, setWaitlistErr] = useState<string | null>(null);
 
   const loadOrders = useCallback(async () => {
     setOrdersLoading(true);
@@ -157,9 +198,26 @@ export default function AdminOrdersPage() {
     }
   }, []);
 
+  const loadWaitlist = useCallback(async () => {
+    setWaitlistLoading(true);
+    setWaitlistErr(null);
+    try {
+      const res = await fetch("/api/admin/waitlist", { cache: "no-store" });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.ok) throw new Error(data?.error || "WAITLIST_LOAD_FAILED");
+      setWaitlistStats({ ...EMPTY_WAITLIST_STATS, ...(data.stats || {}) });
+      setWaitlistEntries(Array.isArray(data.entries) ? data.entries : []);
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Ошибка загрузки листа ожидания";
+      setWaitlistErr(message);
+    } finally {
+      setWaitlistLoading(false);
+    }
+  }, []);
+
   const loadAll = useCallback(async () => {
-    await Promise.all([loadOrders(), loadPromos()]);
-  }, [loadOrders, loadPromos]);
+    await Promise.all([loadOrders(), loadPromos(), loadWaitlist()]);
+  }, [loadOrders, loadPromos, loadWaitlist]);
 
   useEffect(() => {
     loadAll();
@@ -478,6 +536,85 @@ export default function AdminOrdersPage() {
             <div className="rounded-2xl border bg-white px-4 py-3 text-sm text-neutral-600">
               Промокоды пока не созданы.
             </div>
+          )}
+        </div>
+      </section>
+
+      <section className="mt-6 rounded-3xl border bg-white/70 p-5 shadow-sm backdrop-blur sm:p-6">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-medium tracking-tight">Лист ожидания старта продаж</h2>
+            <p className="mt-1 text-sm text-neutral-600">
+              Статистика кнопки «Жду начала продаж» и оставленные контакты.
+            </p>
+          </div>
+        </div>
+
+        {waitlistErr ? (
+          <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {waitlistErr}
+          </div>
+        ) : null}
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-2xl border bg-white p-4">
+            <div className="text-xs text-neutral-500">Клики по кнопке</div>
+            <div className="mt-1 text-2xl font-semibold">{waitlistStats.clicksTotal}</div>
+            <div className="mt-1 text-xs text-neutral-500">
+              Главная: {waitlistStats.clicksHome} · Каталог: {waitlistStats.clicksCatalog}
+            </div>
+          </div>
+          <div className="rounded-2xl border bg-white p-4">
+            <div className="text-xs text-neutral-500">Заявки</div>
+            <div className="mt-1 text-2xl font-semibold">{waitlistStats.submitsTotal}</div>
+            <div className="mt-1 text-xs text-neutral-500">
+              Главная: {waitlistStats.submitsHome} · Каталог: {waitlistStats.submitsCatalog}
+            </div>
+          </div>
+          <div className="rounded-2xl border bg-white p-4">
+            <div className="text-xs text-neutral-500">Уникальные контакты</div>
+            <div className="mt-1 text-2xl font-semibold">{waitlistStats.uniqueTotal}</div>
+            <div className="mt-1 text-xs text-neutral-500">
+              Telegram: {waitlistStats.uniqueTelegram} · Email: {waitlistStats.uniqueEmail}
+            </div>
+          </div>
+          <div className="rounded-2xl border bg-white p-4">
+            <div className="text-xs text-neutral-500">Каналы заявок</div>
+            <div className="mt-1 text-sm text-neutral-700">
+              Telegram: {waitlistStats.submitsTelegram}
+            </div>
+            <div className="text-sm text-neutral-700">Email: {waitlistStats.submitsEmail}</div>
+          </div>
+        </div>
+
+        <div className="mt-4 rounded-2xl border bg-white">
+          <div className="grid grid-cols-[180px_1fr_120px_120px_170px] gap-3 border-b px-4 py-3 text-xs uppercase tracking-wide text-neutral-500">
+            <div>Канал</div>
+            <div>Контакт</div>
+            <div>Первый</div>
+            <div>Последний</div>
+            <div>Обновлен</div>
+          </div>
+
+          {waitlistLoading ? (
+            <div className="px-4 py-4 text-sm text-neutral-600">Загрузка...</div>
+          ) : waitlistEntries.length ? (
+            waitlistEntries.slice(0, 20).map((entry, idx) => (
+              <div
+                key={`${entry.channel}:${entry.contact}:${idx}`}
+                className="grid grid-cols-[180px_1fr_120px_120px_170px] gap-3 px-4 py-3 text-sm"
+              >
+                <div className="capitalize text-neutral-700">
+                  {entry.channel === "telegram" ? "Telegram" : "Email"}
+                </div>
+                <div className="truncate font-mono">{entry.contact}</div>
+                <div className="text-neutral-600">{entry.firstSource === "home" ? "Главная" : "Каталог"}</div>
+                <div className="text-neutral-600">{entry.lastSource === "home" ? "Главная" : "Каталог"}</div>
+                <div className="text-neutral-600">{formatDate(entry.updatedAt)}</div>
+              </div>
+            ))
+          ) : (
+            <div className="px-4 py-4 text-sm text-neutral-600">Пока нет заявок.</div>
           )}
         </div>
       </section>
