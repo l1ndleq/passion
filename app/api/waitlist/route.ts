@@ -2,12 +2,12 @@ import { NextResponse } from "next/server";
 import { redis } from "@/app/lib/redis";
 import {
   WAITLIST_INDEX_KEY,
-  WAITLIST_STATS_KEY,
   parseWaitlistChannel,
   parseWaitlistSource,
   normalizeWaitlistEmail,
   normalizeWaitlistTelegram,
   waitlistEntryKey,
+  waitlistStatKey,
 } from "@/app/lib/waitlist";
 
 export const runtime = "nodejs";
@@ -23,7 +23,56 @@ type WaitlistEntry = {
 };
 
 async function incStat(field: string) {
-  await redis.hincrby(WAITLIST_STATS_KEY, field, 1);
+  await redis.incr(waitlistStatKey(field));
+}
+
+function getAdminChatIds() {
+  return String(process.env.TELEGRAM_CHAT_IDS || "")
+    .split(",")
+    .map((x) => x.trim())
+    .filter(Boolean);
+}
+
+function escapeHtml(s: string) {
+  return String(s || "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
+function getClientIp(req: Request) {
+  const xff = String(req.headers.get("x-forwarded-for") || "")
+    .split(",")
+    .map((x) => x.trim())
+    .filter(Boolean)[0];
+  return xff || String(req.headers.get("x-real-ip") || "").trim() || "unknown";
+}
+
+async function sendAdminWaitlistAlert(text: string) {
+  const token =
+    String(process.env.TELEGRAM_ADMIN_BOT_TOKEN || "").trim() ||
+    String(process.env.TELEGRAM_BOT_TOKEN || "").trim();
+  const chatIds = getAdminChatIds();
+  if (!token || !chatIds.length) return;
+
+  await Promise.all(
+    chatIds.map(async (chatId) => {
+      try {
+        await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: chatId,
+            text,
+            parse_mode: "HTML",
+            disable_web_page_preview: true,
+          }),
+        });
+      } catch {
+        // Нотификация не должна ломать основной флоу.
+      }
+    })
+  );
 }
 
 export async function POST(req: Request) {
@@ -31,6 +80,10 @@ export async function POST(req: Request) {
     const body = await req.json().catch(() => ({}));
     const action = String(body?.action || "subscribe").trim().toLowerCase();
     const source = parseWaitlistSource(body?.source);
+    const now = Date.now();
+    const ip = getClientIp(req);
+    const ua = String(req.headers.get("user-agent") || "unknown").slice(0, 140);
+    const sourceLabel = source === "catalog" ? "Каталог" : "Главная";
 
     if (!source) {
       return NextResponse.json({ ok: false, error: "SOURCE_INVALID" }, { status: 400 });
@@ -38,6 +91,17 @@ export async function POST(req: Request) {
 
     if (action === "click") {
       await Promise.all([incStat("clicks_total"), incStat(`clicks_${source}`)]);
+
+      await sendAdminWaitlistAlert(
+        [
+          "👀 <b>Waitlist: клик по кнопке</b>",
+          `Источник: ${escapeHtml(sourceLabel)}`,
+          `IP: <code>${escapeHtml(ip)}</code>`,
+          `UA: <code>${escapeHtml(ua)}</code>`,
+          `Время: ${new Date(now).toLocaleString("ru-RU")}`,
+        ].join("\n")
+      );
+
       return NextResponse.json({ ok: true });
     }
 
@@ -61,7 +125,6 @@ export async function POST(req: Request) {
 
     const entryId = `${channel}:${contact}`;
     const key = waitlistEntryKey(entryId);
-    const now = Date.now();
     const existing = await redis.get<WaitlistEntry>(key);
 
     const next: WaitlistEntry = {
@@ -72,7 +135,9 @@ export async function POST(req: Request) {
           ? Math.floor(Number(existing.createdAt))
           : now,
       updatedAt: now,
-      firstSource: existing?.firstSource === "catalog" ? "catalog" : source,
+      firstSource: existing?.firstSource === "home" || existing?.firstSource === "catalog"
+        ? existing.firstSource
+        : source,
       lastSource: source,
     };
 
@@ -90,6 +155,19 @@ export async function POST(req: Request) {
     }
 
     await Promise.all(statOps);
+
+    const channelLabel = channel === "telegram" ? "Telegram" : "Email";
+    await sendAdminWaitlistAlert(
+      [
+        "📥 <b>Waitlist: новая заявка</b>",
+        `Статус: ${existing ? "повторная" : "новая"}`,
+        `Источник: ${escapeHtml(sourceLabel)}`,
+        `Канал: ${escapeHtml(channelLabel)}`,
+        `Контакт: <code>${escapeHtml(contact)}</code>`,
+        `IP: <code>${escapeHtml(ip)}</code>`,
+        `Время: ${new Date(now).toLocaleString("ru-RU")}`,
+      ].join("\n")
+    );
 
     return NextResponse.json({ ok: true, alreadySubscribed: Boolean(existing) });
   } catch (error: unknown) {

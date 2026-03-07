@@ -1,4 +1,4 @@
-export const WAITLIST_STATS_KEY = "waitlist:stats";
+export const WAITLIST_STATS_PREFIX = "waitlist:stats:";
 export const WAITLIST_INDEX_KEY = "waitlist:index";
 export const WAITLIST_ENTRY_PREFIX = "waitlist:entry:";
 
@@ -36,4 +36,8 @@ export function normalizeWaitlistTelegram(raw: unknown) {
 
 export function waitlistEntryKey(entryId: string) {
   return `${WAITLIST_ENTRY_PREFIX}${entryId}`;
+}
+
+export function waitlistStatKey(field: string) {
+  return `${WAITLIST_STATS_PREFIX}${field}`;
 }

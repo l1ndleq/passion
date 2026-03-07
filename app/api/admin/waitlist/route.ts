@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { redis } from "@/app/lib/redis";
 import {
   WAITLIST_INDEX_KEY,
-  WAITLIST_STATS_KEY,
   waitlistEntryKey,
+  waitlistStatKey,
   type WaitlistChannel,
   type WaitlistSource,
 } from "@/app/lib/waitlist";
@@ -27,12 +27,29 @@ function toNumber(value: unknown) {
 
 export async function GET() {
   try {
+    const statFields = [
+      "clicks_total",
+      "clicks_home",
+      "clicks_catalog",
+      "submits_total",
+      "submits_home",
+      "submits_catalog",
+      "submits_telegram",
+      "submits_email",
+      "unique_total",
+      "unique_telegram",
+      "unique_email",
+    ] as const;
+
     const [statsRaw, idsRaw] = await Promise.all([
-      redis.hgetall<Record<string, number | string>>(WAITLIST_STATS_KEY),
+      redis.mget(...statFields.map((field) => waitlistStatKey(field))),
       redis.smembers<string[]>(WAITLIST_INDEX_KEY),
     ]);
 
-    const statsObj = statsRaw && typeof statsRaw === "object" ? statsRaw : {};
+    const statValues = Array.isArray(statsRaw) ? statsRaw : [];
+    const statsObj = Object.fromEntries(
+      statFields.map((field, index) => [field, toNumber(statValues[index])])
+    );
     const ids = (Array.isArray(idsRaw) ? idsRaw : []).filter(Boolean);
 
     const rowsRaw = ids.length ? await redis.mget(...ids.map((id) => waitlistEntryKey(id))) : [];
@@ -45,17 +62,17 @@ export async function GET() {
     return NextResponse.json({
       ok: true,
       stats: {
-        clicksTotal: toNumber(statsObj.clicks_total),
-        clicksHome: toNumber(statsObj.clicks_home),
-        clicksCatalog: toNumber(statsObj.clicks_catalog),
-        submitsTotal: toNumber(statsObj.submits_total),
-        submitsHome: toNumber(statsObj.submits_home),
-        submitsCatalog: toNumber(statsObj.submits_catalog),
-        submitsTelegram: toNumber(statsObj.submits_telegram),
-        submitsEmail: toNumber(statsObj.submits_email),
-        uniqueTotal: toNumber(statsObj.unique_total),
-        uniqueTelegram: toNumber(statsObj.unique_telegram),
-        uniqueEmail: toNumber(statsObj.unique_email),
+        clicksTotal: statsObj.clicks_total,
+        clicksHome: statsObj.clicks_home,
+        clicksCatalog: statsObj.clicks_catalog,
+        submitsTotal: statsObj.submits_total,
+        submitsHome: statsObj.submits_home,
+        submitsCatalog: statsObj.submits_catalog,
+        submitsTelegram: statsObj.submits_telegram,
+        submitsEmail: statsObj.submits_email,
+        uniqueTotal: statsObj.unique_total,
+        uniqueTelegram: statsObj.unique_telegram,
+        uniqueEmail: statsObj.unique_email,
       },
       entries: entries.slice(0, 100),
     });

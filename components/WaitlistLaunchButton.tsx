@@ -86,6 +86,12 @@ export default function WaitlistLaunchButton({ source, className }: Props) {
               ? "Некорректный Telegram username. Пример: @my_username"
               : "Некорректный email."
           );
+        } else if (data?.error === "CSRF_FORBIDDEN") {
+          setError("Запрос заблокирован защитой браузера. Обновите страницу и попробуйте снова.");
+        } else if (data?.error === "SOURCE_INVALID" || data?.error === "CHANNEL_INVALID") {
+          setError("Внутренняя ошибка формы. Перезагрузите страницу.");
+        } else if (data?.error === "WAITLIST_FAILED") {
+          setError("Сервис ожидания временно недоступен. Попробуйте чуть позже.");
         } else {
           setError("Не удалось сохранить заявку. Попробуйте еще раз.");
         }

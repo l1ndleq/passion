@@ -134,7 +134,8 @@ function isCsrfExemptPath(pathname: string) {
   return (
     pathname.startsWith("/api/pay/webhook") ||
     pathname.startsWith("/api/telegram/webhook") ||
-    pathname.startsWith("/api/telegram/admin-webhook")
+    pathname.startsWith("/api/telegram/admin-webhook") ||
+    pathname.startsWith("/api/waitlist")
   );
 }
 
