@@ -77,6 +77,7 @@ export default function WaitlistLaunchButton({ source, className }: Props) {
         ok?: boolean;
         error?: string;
         alreadySubscribed?: boolean;
+        userNotified?: boolean;
       };
 
       if (!res.ok || !data?.ok) {
@@ -98,11 +99,14 @@ export default function WaitlistLaunchButton({ source, className }: Props) {
         return;
       }
 
-      setOkMessage(
-        data.alreadySubscribed
-          ? "Вы уже в списке. Мы напомним о старте продаж."
-          : "Готово. Мы сообщим, когда продажи откроются."
-      );
+      const baseMessage = data.alreadySubscribed
+        ? "Вы уже в списке. Мы напомним о старте продаж."
+        : "Готово. Мы сообщим, когда продажи откроются.";
+      if (channel === "telegram" && !data.userNotified) {
+        setOkMessage(`${baseMessage} Чтобы получить сообщение в Telegram, сначала напишите login-боту /start.`);
+      } else {
+        setOkMessage(baseMessage);
+      }
       setContact("");
     } catch {
       setError("Не удалось сохранить заявку. Попробуйте еще раз.");

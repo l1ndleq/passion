@@ -26,6 +26,12 @@ async function incStat(field: string) {
   await redis.incr(waitlistStatKey(field));
 }
 
+function usernameFromContact(contact: string) {
+  const value = String(contact || "").trim().replace(/^@+/, "").toLowerCase();
+  if (!/^[a-z][a-z0-9_]{4,31}$/.test(value)) return "";
+  return value;
+}
+
 function getAdminChatIds() {
   return String(process.env.TELEGRAM_CHAT_IDS || "")
     .split(",")
@@ -73,6 +79,26 @@ async function sendAdminWaitlistAlert(text: string) {
       }
     })
   );
+}
+
+async function sendLoginBotToUser(chatId: number | string, text: string) {
+  const token = String(process.env.TELEGRAM_LOGIN_BOT_TOKEN || "").trim();
+  if (!token) return false;
+  try {
+    const r = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text,
+        disable_web_page_preview: true,
+      }),
+    });
+    const j = await r.json().catch(() => null);
+    return Boolean(r.ok && j?.ok);
+  } catch {
+    return false;
+  }
 }
 
 export async function POST(req: Request) {
@@ -123,38 +149,63 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "CONTACT_INVALID" }, { status: 400 });
     }
 
-    const entryId = `${channel}:${contact}`;
-    const key = waitlistEntryKey(entryId);
-    const existing = await redis.get<WaitlistEntry>(key);
+    let existing: WaitlistEntry | null = null;
+    let storageOk = true;
+    try {
+      const entryId = `${channel}:${contact}`;
+      const key = waitlistEntryKey(entryId);
+      existing = await redis.get<WaitlistEntry>(key);
 
-    const next: WaitlistEntry = {
-      channel,
-      contact,
-      createdAt:
-        existing && Number.isFinite(Number(existing.createdAt))
-          ? Math.floor(Number(existing.createdAt))
-          : now,
-      updatedAt: now,
-      firstSource: existing?.firstSource === "home" || existing?.firstSource === "catalog"
-        ? existing.firstSource
-        : source,
-      lastSource: source,
-    };
+      const next: WaitlistEntry = {
+        channel,
+        contact,
+        createdAt:
+          existing && Number.isFinite(Number(existing.createdAt))
+            ? Math.floor(Number(existing.createdAt))
+            : now,
+        updatedAt: now,
+        firstSource:
+          existing?.firstSource === "home" || existing?.firstSource === "catalog"
+            ? existing.firstSource
+            : source,
+        lastSource: source,
+      };
 
-    await redis.set(key, next);
-    await redis.sadd(WAITLIST_INDEX_KEY, entryId);
+      await redis.set(key, next);
+      await redis.sadd(WAITLIST_INDEX_KEY, entryId);
 
-    const statOps = [
-      incStat("submits_total"),
-      incStat(`submits_${source}`),
-      incStat(`submits_${channel}`),
-    ];
+      const statOps = [
+        incStat("submits_total"),
+        incStat(`submits_${source}`),
+        incStat(`submits_${channel}`),
+      ];
 
-    if (!existing) {
-      statOps.push(incStat("unique_total"), incStat(`unique_${channel}`));
+      if (!existing) {
+        statOps.push(incStat("unique_total"), incStat(`unique_${channel}`));
+      }
+
+      await Promise.all(statOps);
+    } catch {
+      storageOk = false;
     }
 
-    await Promise.all(statOps);
+    let userNotified = false;
+    if (channel === "telegram") {
+      try {
+        const username = usernameFromContact(contact);
+        if (username) {
+          const chatId = await redis.get<number | string>(`tg:username:${username}`);
+          if (chatId) {
+            userNotified = await sendLoginBotToUser(
+              chatId,
+              "✅ Вы в листе ожидания Passion. Сообщим здесь, когда стартуют продажи."
+            );
+          }
+        }
+      } catch {
+        userNotified = false;
+      }
+    }
 
     const channelLabel = channel === "telegram" ? "Telegram" : "Email";
     await sendAdminWaitlistAlert(
@@ -164,14 +215,26 @@ export async function POST(req: Request) {
         `Источник: ${escapeHtml(sourceLabel)}`,
         `Канал: ${escapeHtml(channelLabel)}`,
         `Контакт: <code>${escapeHtml(contact)}</code>`,
+        `Уведомлен ботом: ${userNotified ? "да" : "нет"}`,
+        `Сохранено в БД: ${storageOk ? "да" : "нет"}`,
         `IP: <code>${escapeHtml(ip)}</code>`,
         `Время: ${new Date(now).toLocaleString("ru-RU")}`,
       ].join("\n")
     );
 
-    return NextResponse.json({ ok: true, alreadySubscribed: Boolean(existing) });
+    return NextResponse.json({
+      ok: true,
+      alreadySubscribed: Boolean(existing),
+      userNotified,
+      storageOk,
+    });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "WAITLIST_FAILED";
-    return NextResponse.json({ ok: false, error: message }, { status: 500 });
+    await sendAdminWaitlistAlert(
+      [
+        "⚠️ <b>Waitlist: server error</b>",
+        `Ошибка: <code>${escapeHtml(error instanceof Error ? error.message : "WAITLIST_FAILED")}</code>`,
+      ].join("\n")
+    );
+    return NextResponse.json({ ok: true, degraded: true });
   }
 }

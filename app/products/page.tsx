@@ -9,7 +9,7 @@ export default function ProductsPage() {
     <div className="mx-auto max-w-6xl px-4 py-10">
       {/* Header */}
       <Reveal>
-        <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex flex-col gap-6">
           <div>
             <div className="text-[10px] tracking-[0.22em] uppercase opacity-60">
               PASSION / КАТАЛОГ
@@ -20,10 +20,6 @@ export default function ProductsPage() {
             <p className="mt-3 max-w-xl text-sm opacity-70">
               Продажи пока не открыты. Оставьте контакт, чтобы получить уведомление о старте.
             </p>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <WaitlistLaunchButton source="catalog" />
           </div>
         </div>
       </Reveal>
@@ -59,7 +55,10 @@ export default function ProductsPage() {
             >
               На главную
             </Link>
-            <WaitlistLaunchButton source="catalog" />
+            <WaitlistLaunchButton
+              source="catalog"
+              className="inline-flex h-12 w-full items-center justify-center rounded-full bg-black px-6 text-sm font-semibold tracking-wide uppercase text-white hover:opacity-90 transition sm:w-auto"
+            />
           </div>
         </div>
       </Reveal>

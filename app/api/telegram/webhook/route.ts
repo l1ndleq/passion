@@ -231,6 +231,19 @@ function cartKey(chatId: number | string) {
   return `${TG_CART_PREFIX}${chatId}`;
 }
 
+function normalizeTelegramUsername(raw: unknown) {
+  const value = String(raw || "").trim().replace(/^@+/, "").toLowerCase();
+  if (!/^[a-z][a-z0-9_]{4,31}$/.test(value)) return "";
+  return value;
+}
+
+async function saveUsernameBinding(chatId: number | string, usernameRaw: unknown) {
+  const username = normalizeTelegramUsername(usernameRaw);
+  if (!username) return;
+  await redis.set(`tg:username:${username}`, Number(chatId));
+  await redis.set(`tg:chat_username:${chatId}`, username);
+}
+
 async function readCart(chatId: number | string): Promise<BotCart> {
   const raw = await redis.get<BotCart>(cartKey(chatId));
   const items = Array.isArray(raw?.items)
@@ -592,6 +605,7 @@ export async function POST(req: Request) {
     const callback = update.callback_query;
     if (callback?.message?.chat?.id) {
       const chatId = callback.message.chat.id;
+      await saveUsernameBinding(chatId, callback.from?.username);
       const data = String(callback.data || "").trim();
 
       if (data === "ASK_CONTACT") {
@@ -694,6 +708,7 @@ export async function POST(req: Request) {
     const msg = update.message;
     const chatId = msg?.chat?.id;
     if (!chatId) return NextResponse.json({ ok: true });
+    await saveUsernameBinding(chatId, msg?.from?.username);
 
     const text = String(msg?.text || "").trim();
 
